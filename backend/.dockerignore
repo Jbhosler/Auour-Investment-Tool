@@ -1,0 +1,51 @@
+# Backend .dockerignore
+# Files and directories to exclude from Docker build
+
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment files (we'll use secrets instead)
+.env
+.env.local
+.env.development
+.env.production
+
+# Database files (not needed in container)
+*.db
+*.sqlite
+*.sqlite3
+
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Test files
+test
+tests
+__tests__
+*.test.js
+*.spec.js
+
+# Build artifacts
+dist
+build

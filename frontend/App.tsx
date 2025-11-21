@@ -1,0 +1,575 @@
+
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation } from './types';
+import { blendPortfolios, calculateMetrics } from './services/performanceCalculator';
+import { apiService } from './services/apiService';
+import { useApiState, useSettingsState } from './hooks/useApiState';
+import StrategySelector from './components/StrategySelector';
+import BenchmarkSelector from './components/BenchmarkSelector';
+import ReportOutput from './components/ReportOutput';
+import { AiSummary } from './components/AiSummary';
+import AdminPanel from './components/AdminPanel';
+import AllocationCharts from './components/AllocationCharts';
+import ProposalDetailsForm from './components/ProposalDetailsForm';
+
+const App: React.FC = () => {
+    // PHASE 1 DIAGNOSTIC: App component render logging
+    console.error('🏠🏠🏠 App COMPONENT RENDERED 🏠🏠🏠');
+    try {
+        localStorage.setItem('app_component_rendered', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            message: 'App component rendered'
+        }));
+        console.error('✅ Stored App render test to localStorage');
+    } catch (e) {
+        console.error('❌ Failed to store App render test:', e);
+    }
+    
+    const [isAdminMode, setIsAdminMode] = useState(false);
+    
+    // Use API state instead of localStorage
+    const [strategies, setStrategies, strategiesState] = useApiState('strategies', []);
+    const [benchmarks, setBenchmarks, benchmarksState] = useApiState('benchmarks', []);
+    const [settings, updateSettings, settingsState] = useSettingsState();
+
+    const [portfolioAllocations, setPortfolioAllocations] = useState<Allocation[]>([]);
+    const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('b1');
+    const [reportData, setReportData] = useState<ReportData | null>(null);
+    const [aiSummary, setAiSummary] = useState<string>('');
+
+    // Proposal details
+    const [adviserName, setAdviserName] = useState<string>('');
+    const [clientName, setClientName] = useState<string>('');
+    const [investmentAmount, setInvestmentAmount] = useState<string>('');
+    const [clientAge, setClientAge] = useState<string>('');
+    const [annualDistribution, setAnnualDistribution] = useState<string>('');
+    const [riskTolerance, setRiskTolerance] = useState<string>('');
+    
+    // Initialize allocations when strategies load
+  // Initialize allocations when strategies load
+useEffect(() => {
+    if (strategies.length > 0 && portfolioAllocations.length === 0) {
+        if (strategies.length >= 2) {
+            setPortfolioAllocations([
+                { strategyId: strategies[0].id, weight: 60 },
+                { strategyId: strategies[1].id, weight: 40 }
+            ]);
+        } else {
+            // Handle the single strategy case by allocating 100% to it
+            setPortfolioAllocations([
+                { strategyId: strategies[0].id, weight: 100 }
+            ]);
+        }
+    }
+}, [strategies, portfolioAllocations.length]); // Added .length to dependency for safety
+
+    const totalAllocation = useMemo(() => 
+        portfolioAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0), 
+        [portfolioAllocations]
+    );
+
+    const benchmarkMetricsMap = useMemo(() => {
+        const map = new Map<string, PerformanceMetrics>();
+        benchmarks.forEach(b => {
+            map.set(b.id, calculateMetrics(b.returns));
+        });
+        return map;
+    }, [benchmarks]);
+    
+    // Auto-select best-fit benchmark
+    useEffect(() => {
+        if (totalAllocation !== 100 || portfolioAllocations.length === 0) {
+            setReportData(null);
+            return;
+        }
+
+        // Defensively check for missing strategies and filter them out
+        const validAllocations = portfolioAllocations.filter(alloc => 
+            strategies.find(s => s.id === alloc.strategyId)
+        );
+
+        // If there are invalid allocations, clean them up silently
+        if (validAllocations.length !== portfolioAllocations.length) {
+            const invalidIds = portfolioAllocations
+                .filter(alloc => !strategies.find(s => s.id === alloc.strategyId))
+                .map(alloc => alloc.strategyId);
+            console.warn('Removed invalid strategy allocations:', invalidIds);
+            
+            // Recalculate weights if needed
+            if (validAllocations.length > 0) {
+                const totalWeight = validAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
+                if (totalWeight !== 100 && totalWeight > 0) {
+                    // Normalize weights to sum to 100%
+                    const normalizedAllocations = validAllocations.map(alloc => ({
+                        ...alloc,
+                        weight: Math.round((alloc.weight / totalWeight) * 100)
+                    }));
+                    // Adjust last one to ensure exact 100%
+                    const normalizedTotal = normalizedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
+                    if (normalizedTotal !== 100 && normalizedAllocations.length > 0) {
+                        normalizedAllocations[normalizedAllocations.length - 1].weight += (100 - normalizedTotal);
+                    }
+                    setPortfolioAllocations(normalizedAllocations);
+                    return; // Exit early, will re-run with cleaned allocations
+                } else {
+                    setPortfolioAllocations(validAllocations);
+                    return; // Exit early, will re-run with cleaned allocations
+                }
+            } else {
+                setPortfolioAllocations([]);
+                return; // No valid allocations left
+            }
+        }
+
+        // Now that we know they all exist, we can safely create the list
+        const selectedStrategies = portfolioAllocations.map(alloc => {
+            const strategy = strategies.find(s => s.id === alloc.strategyId);
+            if (!strategy) return null; // Should not happen after filtering, but defensive
+            return {
+                ...strategy,
+                weight: alloc.weight / 100
+            };
+        }).filter((s): s is NonNullable<typeof s> => s !== null); // Filter out any nulls
+           
+   
+
+
+        const portfolioReturns = blendPortfolios(selectedStrategies);
+        const portfolioMetrics = calculateMetrics(portfolioReturns);
+        const portfolioVolatility = portfolioMetrics.volatility;
+
+        if (portfolioVolatility === null || benchmarks.length === 0) return;
+
+        let bestFitBenchmarkId: string | null = null;
+        let minVolatilityDiff = Infinity;
+
+        benchmarks.forEach(benchmark => {
+            const benchMetrics = benchmarkMetricsMap.get(benchmark.id);
+            if (benchMetrics?.volatility !== null) {
+                const diff = Math.abs(portfolioVolatility - benchMetrics.volatility!);
+                if (diff < minVolatilityDiff) {
+                    minVolatilityDiff = diff;
+                    bestFitBenchmarkId = benchmark.id;
+                }
+            }
+        });
+
+        if (bestFitBenchmarkId) {
+            setSelectedBenchmarkId(bestFitBenchmarkId);
+        }
+    }, [portfolioAllocations, totalAllocation, strategies, benchmarks, benchmarkMetricsMap]);
+    
+    useEffect(() => {
+        if (benchmarks.length > 0 && !benchmarks.some(b => b.id === selectedBenchmarkId)) {
+            setSelectedBenchmarkId(benchmarks[0].id);
+        }
+    }, [benchmarks, selectedBenchmarkId]);
+
+    const strategyAllocationData = useMemo(() => {
+        return portfolioAllocations
+            .map(alloc => {
+                const strategy = strategies.find(s => s.id === alloc.strategyId);
+                return {
+                    name: strategy ? strategy.name : 'Unknown Strategy',
+                    value: alloc.weight,
+                };
+            });
+    }, [portfolioAllocations, strategies]);
+
+    const categoryAllocationData = useMemo(() => {
+        const totals: { [key: string]: number } = {
+            'Equity': 0,
+            'Fixed Income': 0,
+            'Alternatives': 0,
+        };
+
+        portfolioAllocations.forEach(alloc => {
+            const strategy = strategies.find(s => s.id === alloc.strategyId);
+            if (strategy && strategy.assetAllocation) {
+                const portfolioWeight = alloc.weight / 100;
+                totals['Equity'] += portfolioWeight * (strategy.assetAllocation.equity / 100);
+                totals['Fixed Income'] += portfolioWeight * (strategy.assetAllocation.fixedIncome / 100);
+                totals['Alternatives'] += portfolioWeight * (strategy.assetAllocation.alternatives / 100);
+            }
+        });
+
+        return Object.entries(totals)
+            .map(([name, value]) => ({ name, value: value * 100 }))
+            .filter(item => item.value > 0.01);
+    }, [portfolioAllocations, strategies]);
+
+    const handleGenerateReport = useCallback(async () => {
+        if (totalAllocation !== 100) {
+            alert("Total allocation must be 100%.");
+            return;
+        }
+
+        const selectedStrategies = portfolioAllocations.map(alloc => {
+            const strategy = strategies.find(s => s.id === alloc.strategyId);
+            if (!strategy) throw new Error("Strategy not found");
+            return {
+                ...strategy,
+                weight: alloc.weight / 100
+            };
+        });
+
+        const benchmark = benchmarks.find(b => b.id === selectedBenchmarkId);
+        if (!benchmark) {
+            alert("Please select a benchmark.");
+            return;
+        }
+
+        const portfolioReturns = blendPortfolios(selectedStrategies);
+        const investmentAmountNum = parseFloat(investmentAmount) || 0;
+        const annualDistributionNum = parseFloat(annualDistribution) || 0;
+        const clientAgeNum = parseFloat(clientAge) || 0;
+        const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
+        const benchmarkMetrics = calculateMetrics(benchmark.returns, investmentAmountNum, annualDistributionNum, clientAgeNum);
+
+        const report: ReportData = {
+            portfolio: {
+                ...portfolioMetrics,
+                name: 'Portfolio'
+            },
+            benchmark: {
+                ...benchmarkMetrics,
+                name: benchmark.name
+            }
+        };
+
+        setReportData(report);
+
+        // Save proposal
+        try {
+            await apiService.createProposal({
+                adviser_name: adviserName,
+                client_name: clientName,
+                investment_amount: investmentAmount,
+                client_age: clientAge,
+                annual_distribution: annualDistribution,
+                risk_tolerance: riskTolerance,
+                allocations: portfolioAllocations,
+                selected_benchmark_id: selectedBenchmarkId,
+                ai_summary: aiSummary
+            });
+        } catch (error) {
+            console.error('Error saving proposal:', error);
+        }
+    }, [
+        totalAllocation, portfolioAllocations, strategies, benchmarks, selectedBenchmarkId,
+        adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance, aiSummary
+    ]);
+
+    // Admin handlers with API
+ const handleAddStrategy = async (name: string, returns: MonthlyReturn[], assetAllocation: AssetAllocation) => {
+    try {
+        const strategy = {
+            name,
+            returns,
+            assetAllocation
+        };
+        const newStrategy = await apiService.createStrategy(strategy);
+        setStrategies([...strategies, newStrategy]);
+    } catch (error) {
+        alert('Failed to add strategy');
+    }
+};
+
+    const handleUpdateStrategy = async (id: string, name: string, assetAllocation: AssetAllocation) => {
+        try {
+            // Find the existing strategy to preserve returns
+            const existingStrategy = strategies.find(s => s.id === id);
+            if (!existingStrategy) {
+                alert('Strategy not found');
+                return;
+            }
+            
+            // Update with name and assetAllocation, preserving existing returns
+            const updated = await apiService.updateStrategy(id, {
+                name,
+                returns: existingStrategy.returns, // Preserve existing returns
+                assetAllocation
+            });
+            setStrategies(strategies.map(s => s.id === id ? { ...s, ...updated } : s));
+        } catch (error) {
+            console.error('Failed to update strategy:', error);
+            alert('Failed to update strategy. Please check the console for details.');
+        }
+    };
+
+    const handleDeleteStrategy = async (id: string) => {
+        try {
+            await apiService.deleteStrategy(id);
+            setStrategies(strategies.filter(s => s.id !== id));
+            // Remove deleted strategy from portfolio allocations
+            const updatedAllocations = portfolioAllocations.filter(alloc => alloc.strategyId !== id);
+            // Recalculate weights if needed to maintain 100% total
+            if (updatedAllocations.length > 0) {
+                const totalWeight = updatedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
+                if (totalWeight !== 100 && totalWeight > 0) {
+                    // Normalize weights to sum to 100%
+                    const normalizedAllocations = updatedAllocations.map(alloc => ({
+                        ...alloc,
+                        weight: Math.round((alloc.weight / totalWeight) * 100)
+                    }));
+                    // Adjust last one to ensure exact 100%
+                    const normalizedTotal = normalizedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
+                    if (normalizedTotal !== 100 && normalizedAllocations.length > 0) {
+                        normalizedAllocations[normalizedAllocations.length - 1].weight += (100 - normalizedTotal);
+                    }
+                    setPortfolioAllocations(normalizedAllocations);
+                } else {
+                    setPortfolioAllocations(updatedAllocations);
+                }
+            } else {
+                // No allocations left, reset to default if strategies available
+                setPortfolioAllocations([]);
+            }
+        } catch (error) {
+            console.error('Failed to delete strategy:', error);
+            alert('Failed to delete strategy. Please check the console for details.');
+        }
+    };
+
+ const handleAddBenchmark = async (name: string, returns: MonthlyReturn[]) => {
+    try {
+        const benchmark = {
+            name,
+            returns
+        };
+        const newBenchmark = await apiService.createBenchmark(benchmark);
+        setBenchmarks([...benchmarks, newBenchmark]);
+    } catch (error) {
+        alert('Failed to add benchmark');
+    }
+};
+
+    const handleUpdateBenchmark = async (id: string, name: string) => {
+        try {
+            // Find the existing benchmark to preserve returns
+            const existingBenchmark = benchmarks.find(b => b.id === id);
+            if (!existingBenchmark) {
+                alert('Benchmark not found');
+                return;
+            }
+            
+            // Update with name, preserving existing returns
+            const updated = await apiService.updateBenchmark(id, {
+                name,
+                returns: existingBenchmark.returns // Preserve existing returns
+            });
+            setBenchmarks(benchmarks.map(b => b.id === id ? { ...b, ...updated } : b));
+        } catch (error) {
+            console.error('Failed to update benchmark:', error);
+            alert('Failed to update benchmark. Please check the console for details.');
+        }
+    };
+
+    const handleDeleteBenchmark = async (id: string) => {
+        try {
+            await apiService.deleteBenchmark(id);
+            setBenchmarks(benchmarks.filter(b => b.id !== id));
+            // If the deleted benchmark was selected, reset to first available
+            if (selectedBenchmarkId === id && benchmarks.length > 1) {
+                const remainingBenchmarks = benchmarks.filter(b => b.id !== id);
+                if (remainingBenchmarks.length > 0) {
+                    setSelectedBenchmarkId(remainingBenchmarks[0].id);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to delete benchmark:', error);
+            alert('Failed to delete benchmark. Please check the console for details.');
+        }
+    };
+
+    const handleAddBeforeOutputPage = async (pageData: string) => {
+        const newPages = [...(settings.before_output_pages || []), pageData];
+        await updateSettings({ ...settings, before_output_pages: newPages });
+    };
+
+    const handleDeleteBeforeOutputPage = async (index: number) => {
+        const newPages = settings.before_output_pages?.filter((_, i) => i !== index) || [];
+        await updateSettings({ ...settings, before_output_pages: newPages });
+    };
+
+    const handleReorderBeforeOutputPages = async (startIndex: number, endIndex: number) => {
+        const result = Array.from(settings.before_output_pages || []);
+        const [removed] = result.splice(startIndex, 1);
+        result.splice(endIndex, 0, removed);
+        await updateSettings({ ...settings, before_output_pages: result });
+    };
+
+    const handleAddPageAfterOutput = async (pageData: string) => {
+        const newPages = [...(settings.after_output_pages || []), pageData];
+        await updateSettings({ ...settings, after_output_pages: newPages });
+    };
+
+    const handleDeletePageAfterOutput = async (index: number) => {
+        const newPages = settings.after_output_pages?.filter((_, i) => i !== index) || [];
+        await updateSettings({ ...settings, after_output_pages: newPages });
+    };
+
+    const handleReorderPagesAfterOutput = async (startIndex: number, endIndex: number) => {
+        const result = Array.from(settings.after_output_pages || []);
+        const [removed] = result.splice(startIndex, 1);
+        result.splice(endIndex, 0, removed);
+        await updateSettings({ ...settings, after_output_pages: result });
+    };
+
+    const handleSetFirmLogo = async (logoData: string | null) => {
+        await updateSettings({ ...settings, logo_data: logoData });
+    };
+
+    if (strategiesState.loading || benchmarksState.loading || settingsState.loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading application...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+            <header className="bg-white shadow-md">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">Investment Proposal Generator</h1>
+                        <p className="text-gray-600 mt-1">Create compelling, data-driven investment proposals for your clients.</p>
+                    </div>
+                     <div className="flex items-center space-x-4">
+                        <span className="text-sm font-medium text-gray-700">{isAdminMode ? 'Admin Mode' : 'Adviser View'}</span>
+                        <label htmlFor="admin-toggle" className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="admin-toggle" className="sr-only peer" checked={isAdminMode} onChange={() => setIsAdminMode(!isAdminMode)} />
+                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </header>
+
+            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+                {isAdminMode ? (
+                     <AdminPanel
+                        strategies={strategies}
+                        benchmarks={benchmarks}
+                        onAddStrategy={handleAddStrategy}
+                        onUpdateStrategy={handleUpdateStrategy}
+                        onDeleteStrategy={handleDeleteStrategy}
+                        onAddBenchmark={handleAddBenchmark}
+                        onUpdateBenchmark={handleUpdateBenchmark}
+                        onDeleteBenchmark={handleDeleteBenchmark}
+                        beforeOutputPages={settings.before_output_pages || []}
+                        pagesAfterOutput={settings.after_output_pages || []}
+                        onAddBeforeOutputPage={handleAddBeforeOutputPage}
+                        onDeleteBeforeOutputPage={handleDeleteBeforeOutputPage}
+                        onReorderBeforeOutputPage={handleReorderBeforeOutputPages}
+                        onAddPageAfterOutput={handleAddPageAfterOutput}
+                        onDeletePageAfterOutput={handleDeletePageAfterOutput}
+                        onReorderPageAfterOutput={handleReorderPagesAfterOutput}
+                        firmLogo={settings.logo_data}
+                        onSetFirmLogo={handleSetFirmLogo}
+                    />
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 space-y-8">
+                            <ProposalDetailsForm
+                                adviserName={adviserName}
+                                setAdviserName={setAdviserName}
+                                clientName={clientName}
+                                setClientName={setClientName}
+                                investmentAmount={investmentAmount}
+                                setInvestmentAmount={setInvestmentAmount}
+                                clientAge={clientAge}
+                                setClientAge={setClientAge}
+                                annualDistribution={annualDistribution}
+                                setAnnualDistribution={setAnnualDistribution}
+                                riskTolerance={riskTolerance}
+                                setRiskTolerance={setRiskTolerance}
+                            />
+                            <div className="bg-white p-6 rounded-lg shadow-lg">
+                                <h2 className="text-xl font-semibold mb-4 border-b pb-2">1. Configure Portfolio</h2>
+                                {strategies.length > 0 ? (
+                                    <StrategySelector
+                                        strategies={strategies}
+                                        allocations={portfolioAllocations}
+                                        setAllocations={setPortfolioAllocations}
+                                    />
+                                ) : <p className="text-gray-500">No strategies available. Please add one in the Admin Panel.</p>}
+                            </div>
+                            
+                            {totalAllocation > 0 && (
+                                <AllocationCharts
+                                    strategyAllocationData={strategyAllocationData}
+                                    categoryAllocationData={categoryAllocationData}
+                                />
+                            )}
+
+                            <div className="bg-white p-6 rounded-lg shadow-lg">
+                                <h2 className="text-xl font-semibold mb-1 border-b pb-2">2. Select Benchmark</h2>
+                                <p className="text-sm text-gray-500 my-3">A benchmark is automatically suggested based on portfolio volatility. You can override it below.</p>
+                                {benchmarks.length > 0 ? (
+                                    <BenchmarkSelector
+                                        benchmarks={benchmarks}
+                                        selectedBenchmarkId={selectedBenchmarkId}
+                                        setSelectedBenchmarkId={setSelectedBenchmarkId}
+                                    />
+                                ) : <p className="text-gray-500">No benchmarks available. Please add one in the Admin Panel.</p>}
+                            </div>
+
+                            <button
+                                onClick={handleGenerateReport}
+                                disabled={totalAllocation !== 100 || strategies.length === 0 || benchmarks.length === 0}
+                                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300 shadow-md text-lg"
+                            >
+                                Generate Report
+                            </button>
+                        </div>
+
+                        <div className="lg:col-span-2">
+                            {reportData ? (
+                               <div className="space-y-8">
+                                    <AiSummary 
+                                        reportData={reportData} 
+                                        summary={aiSummary} 
+                                        onSummaryUpdate={setAiSummary} 
+                                        clientAge={clientAge}
+                                        annualDistribution={annualDistribution}
+                                        riskTolerance={riskTolerance}
+                                        investmentAmount={investmentAmount}
+                                        clientName={clientName}
+                                        adviserName={adviserName}
+                                    />
+                                    <ReportOutput
+                                      reportData={reportData}
+                                      beforeOutputPages={settings.before_output_pages || []}
+                                      pagesAfterOutput={settings.after_output_pages || []}
+                                      aiSummary={aiSummary}
+                                      firmLogo={settings.logo_data}
+                                      adviserName={adviserName}
+                                      clientName={clientName}
+                                      investmentAmount={investmentAmount}
+                                      clientAge={clientAge}
+                                      annualDistribution={annualDistribution}
+                                      riskTolerance={riskTolerance}
+                                    />
+                               </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg h-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <h3 className="text-2xl font-semibold text-gray-700 mt-6">Your Report Awaits</h3>
+                                    <p className="text-gray-500 mt-2 text-center">Configure your portfolio and select a benchmark, then click "Generate Report" to see the analysis.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                 )}
+            </main>
+        </div>
+    );
+};
+
+export default App;

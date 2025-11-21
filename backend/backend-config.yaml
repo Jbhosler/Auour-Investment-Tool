@@ -1,0 +1,84 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    run.googleapis.com/client-name: gcloud
+    run.googleapis.com/client-version: 546.0.0
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+    run.googleapis.com/operation-id: 6a034196-7809-4f3f-bebe-e7cce4733185
+    run.googleapis.com/urls: '["https://backend-559675342331.us-central1.run.app","https://backend-phd2mjs6qa-uc.a.run.app"]'
+    serving.knative.dev/creator: joseph.hosler@gmail.com
+    serving.knative.dev/lastModifier: joseph.hosler@gmail.com
+  creationTimestamp: '2025-11-08T23:04:40.275143Z'
+  generation: 6
+  labels:
+    cloud.googleapis.com/location: us-central1
+  name: backend
+  namespace: '559675342331'
+  resourceVersion: AAZDKWfTxUI
+  selfLink: /apis/serving.knative.dev/v1/namespaces/559675342331/services/backend
+  uid: a457a1b2-4d4a-49cd-b811-d2569a467795
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/client-name: gcloud
+        run.googleapis.com/client-version: 546.0.0
+        run.googleapis.com/cloudsql-instances: investment-proposal-prod:us-central1:investment-proposal-db
+        run.googleapis.com/startup-cpu-boost: 'true'
+      labels:
+        client.knative.dev/nonce: lmvsxtfokz
+        run.googleapis.com/startupProbeType: Default
+    spec:
+      containerConcurrency: 80
+      containers:
+      - env:
+        - name: NODE_ENV
+          value: production
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: database-url
+        image: gcr.io/investment-proposal-prod/backend
+        ports:
+        - containerPort: 8080
+          name: http1
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 1
+          periodSeconds: 240
+          tcpSocket:
+            port: 8080
+          timeoutSeconds: 240
+      serviceAccountName: 559675342331-compute@developer.gserviceaccount.com
+      timeoutSeconds: 300
+  traffic:
+  - latestRevision: true
+    percent: 100
+status:
+  address:
+    url: https://backend-phd2mjs6qa-uc.a.run.app
+  conditions:
+  - lastTransitionTime: '2025-11-09T13:29:34.915906Z'
+    status: 'True'
+    type: Ready
+  - lastTransitionTime: '2025-11-09T13:29:33.894978Z'
+    status: 'True'
+    type: ConfigurationsReady
+  - lastTransitionTime: '2025-11-09T13:29:34.874958Z'
+    status: 'True'
+    type: RoutesReady
+  latestCreatedRevisionName: backend-00006-kww
+  latestReadyRevisionName: backend-00006-kww
+  observedGeneration: 6
+  traffic:
+  - latestRevision: true
+    percent: 100
+    revisionName: backend-00006-kww
+  url: https://backend-phd2mjs6qa-uc.a.run.app

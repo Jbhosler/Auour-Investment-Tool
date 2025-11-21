@@ -1,0 +1,5 @@
+{
+  "name": "Investment Proposal Generator",
+  "description": "An application for financial advisers to create investment proposals, comparing customized portfolio strategies against benchmarks with detailed performance analytics and AI-powered summaries.",
+  "requestFramePermissions": []
+}

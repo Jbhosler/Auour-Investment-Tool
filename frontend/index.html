@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Investment Proposal Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  <!-- REMOVED IMPORTMAP - It was interfering with @google/generative-ai bundling -->
+  <!-- The importmap was mapping @google/genai (different package) but we use @google/generative-ai -->
+</head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+    <script src="/config.js"></script>
+    <script type="module" src="/index.tsx"></script>
+    <!-- DIAGNOSTIC: Check if React app loaded -->
+    <script>
+      // This runs immediately when HTML loads
+      console.error('📄 HTML loaded - checking for React app...');
+      setTimeout(function() {
+        const root = document.getElementById('root');
+        const hasContent = root && root.innerHTML.trim().length > 0;
+        console.error('📄 Root element check:', {
+          rootExists: !!root,
+          hasContent: hasContent,
+          rootHTML: root ? root.innerHTML.substring(0, 100) : 'none'
+        });
+        if (!hasContent) {
+          console.error('❌ React app did not load! Root is empty.');
+          // Error logged to console only (no alert in production)
+        }
+      }, 2000);
+    </script>
+    <!-- PHASE 1 & 2 DIAGNOSTICS: Expose diagnostic utilities to window for browser console testing -->
+    <script>
+      // Make diagnostic utilities available in browser console
+      window.__DIAGNOSTICS__ = {
+        // Test dynamic import of @google/generative-ai
+        // Note: Run this manually in console: await import('@google/generative-ai')
+        // This function provides instructions instead of doing the import to avoid build issues
+        testDynamicImport: async function() {
+          console.log('🧪 To test dynamic import, run this in the console:');
+          console.log('   const module = await import("@google/generative-ai");');
+          console.log('   console.log("Module:", module);');
+          console.log('   console.log("GoogleGenerativeAI:", module?.GoogleGenerativeAI);');
+          console.log('');
+          console.log('Or use this one-liner:');
+          console.log('   await import("@google/generative-ai").then(m => console.log("✅ Import successful!", m));');
+          return { 
+            success: true, 
+            message: 'See console instructions above. Run the import manually to test.',
+            instructions: 'Run: await import("@google/generative-ai") in console'
+          };
+        },
+        
+        // Check localStorage diagnostics
+        checkLocalStorage: function() {
+          console.log('📦 Checking localStorage diagnostics...');
+          const keys = [
+            'page_load_start',
+            'gemini_service_module_loaded',
+            'ai_summary_component_rendered',
+            'button_click_test',
+            'last_diagnostic',
+            'diagnostic_logs',
+            'global_error',
+            'unhandled_rejection',
+            'react_render_error',
+            'react_render_complete'
+          ];
+          
+          keys.forEach(key => {
+            const value = localStorage.getItem(key);
+            if (value) {
+              console.log(`✅ ${key}:`, JSON.parse(value));
+            } else {
+              console.log(`❌ ${key}: not found`);
+            }
+          });
+        },
+        
+        // Check window.__ENV__ config
+        checkConfig: function() {
+          console.log('⚙️ Checking config...');
+          console.log('window.__ENV__:', window.__ENV__);
+          console.log('window.__ENV__?.VITE_GEMINI_API_KEY exists:', !!window.__ENV__?.VITE_GEMINI_API_KEY);
+          console.log('window.__ENV__?.VITE_GEMINI_API_KEY length:', window.__ENV__?.VITE_GEMINI_API_KEY?.length);
+          if (window.__ENV__?.VITE_GEMINI_API_KEY) {
+            console.log('window.__ENV__?.VITE_GEMINI_API_KEY prefix:', window.__ENV__?.VITE_GEMINI_API_KEY.substring(0, 10));
+          }
+        },
+        
+        // Run all diagnostics
+        runAll: function() {
+          console.log('🔍 Running all diagnostics...');
+          this.checkConfig();
+          this.checkLocalStorage();
+          this.testDynamicImport();
+        }
+      };
+      
+      console.log('✅ Diagnostic utilities loaded! Use window.__DIAGNOSTICS__ in console.');
+      console.log('Available methods:');
+      console.log('  - window.__DIAGNOSTICS__.testDynamicImport()');
+      console.log('  - window.__DIAGNOSTICS__.checkLocalStorage()');
+      console.log('  - window.__DIAGNOSTICS__.checkConfig()');
+      console.log('  - window.__DIAGNOSTICS__.runAll()');
+    </script>
+  </body>
+</html>

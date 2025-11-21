@@ -1,0 +1,61 @@
+# Frontend .dockerignore
+# Files and directories to exclude from Docker build
+
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test.local
+
+
+# Build output (we'll create fresh in container)
+dist
+build
+.vite
+
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Test files
+test
+tests
+__tests__
+*.test.js
+*.test.jsx
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.jsx
+*.spec.ts
+*.spec.tsx
+coverage
+
+# Misc
+.cache
+.temp
+tmp
