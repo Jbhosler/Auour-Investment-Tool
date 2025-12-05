@@ -11,7 +11,7 @@ import TitlePage from './TitlePage';
 import ReportPage from './ReportPage'; // New import
 import GrowthChart from './GrowthChart';
 import DistributionAnalysis from './DistributionAnalysis';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@^4.4.168/build/pdf.worker.min.mjs';
 
@@ -27,18 +27,24 @@ interface ReportOutputProps {
     clientAge: string;
     annualDistribution: string;
     riskTolerance: string;
+    strategyAllocationData?: { name: string; value: number }[];
+    categoryAllocationData?: { name: string; value: number }[];
+    benchmarkAllocationData?: { name: string; value: number }[];
+    benchmarkCategoryAllocationData?: { name: string; value: number }[];
 }
 
 // Component to display captured chart image in PDF
-const CapturedChartImage: React.FC<{ imageDataUrl: string; title: string }> = ({ imageDataUrl, title }) => {
+const CapturedChartImage: React.FC<{ imageDataUrl: string; title: string; showTitle?: boolean }> = ({ imageDataUrl, title, showTitle = false }) => {
     if (!imageDataUrl) {
-        return <div className="p-4 text-gray-500">Chart not available</div>;
+        return <div className="p-4 text-gray-500" style={{ fontSize: '0.875rem' }}>Chart not available</div>;
     }
     return (
-        <div className="bg-white p-6 rounded-lg border border-gray-300 shadow-sm">
-            <div className="mb-4 pb-2 border-b border-[#003365]">
-                <h4 className="font-semibold text-lg text-[#003365]">{title}</h4>
-            </div>
+        <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
+            {showTitle && (
+                <div className="mb-3 pb-2 border-b border-gray-200">
+                    <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '1rem' }}>{title}</h4>
+                </div>
+            )}
             <div className="flex justify-center">
                 <img src={imageDataUrl} alt={title} className="max-w-full h-auto" style={{ maxHeight: '400px' }} />
             </div>
@@ -50,32 +56,97 @@ const SummaryForPdf: React.FC<{ summary: string }> = ({ summary }) => {
     const paragraphs = summary.split('\n').filter(p => p.trim() !== '');
     
     return (
-        <div className="space-y-5">
-            <div className="mb-4 pb-2 border-b border-[#003365]">
-                <h3 className="text-lg font-semibold text-[#003365]">Executive Summary</h3>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="mb-2 pb-1 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Executive Summary</h3>
             </div>
-            <div className="bg-white border border-gray-300 rounded-lg p-5 shadow-sm">
-                <div className="prose max-w-none text-gray-700 space-y-3" style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
-                    {paragraphs.map((paragraph, index) => {
-                        // Check if paragraph is a heading (starts with ** and ends with **)
-                        const isHeading = paragraph.trim().startsWith('**') && paragraph.trim().endsWith('**');
-                        const cleanParagraph = paragraph.replace(/\*\*/g, '').trim();
-                        
-                        if (isHeading) {
-                            return (
-                                <h4 key={index} className="text-base font-semibold text-[#003365] mt-3 mb-2 pb-1 border-b border-gray-200">
-                                    {cleanParagraph}
-                                </h4>
-                            );
-                        }
-                        
+            <div className="prose max-w-none text-gray-600 space-y-2" style={{ fontSize: '0.75rem', lineHeight: '1.5' }}>
+                {paragraphs.map((paragraph, index) => {
+                    // Check if paragraph is a heading (starts with ** and ends with **)
+                    const isHeading = paragraph.trim().startsWith('**') && paragraph.trim().endsWith('**');
+                    const cleanParagraph = paragraph.replace(/\*\*/g, '').trim();
+                    
+                    if (isHeading) {
                         return (
-                            <p key={index} className="text-sm leading-relaxed text-gray-700 break-words">
-                                {paragraph}
-                            </p>
+                            <h4 key={index} className="font-semibold text-[#003365] mt-2 mb-1 pb-0.5 border-b border-gray-200" style={{ fontSize: '0.8rem' }}>
+                                {cleanParagraph}
+                            </h4>
                         );
-                    })}
-                </div>
+                    }
+                    
+                    return (
+                        <p key={index} className="leading-relaxed text-gray-600 break-words" style={{ fontSize: '0.75rem', lineHeight: '1.5' }}>
+                            {paragraph}
+                        </p>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// Component to display client variables/information
+const ClientVariables: React.FC<{
+    clientName: string;
+    investmentAmount: string;
+    clientAge: string;
+    annualDistribution: string;
+    riskTolerance: string;
+    adviserName: string;
+}> = ({ clientName, investmentAmount, clientAge, annualDistribution, riskTolerance, adviserName }) => {
+    const formatCurrency = (value: string) => {
+        const number = parseFloat(value.replace(/[^0-9.-]+/g, ""));
+        if (isNaN(number)) return value;
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(number);
+    };
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="mb-2 pb-1 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Client Information</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+                {clientName && (
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Client Name</p>
+                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{clientName}</p>
+                    </div>
+                )}
+                {clientAge && (
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Age</p>
+                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{clientAge} years</p>
+                    </div>
+                )}
+                {investmentAmount && (
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Investment Amount</p>
+                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{formatCurrency(investmentAmount)}</p>
+                    </div>
+                )}
+                {annualDistribution && (
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Annual Distribution</p>
+                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{formatCurrency(annualDistribution)}</p>
+                    </div>
+                )}
+                {riskTolerance && (
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Risk Tolerance</p>
+                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{riskTolerance}</p>
+                    </div>
+                )}
+                {adviserName && (
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Adviser</p>
+                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{adviserName}</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -93,7 +164,11 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
     investmentAmount,
     clientAge,
     annualDistribution,
-    riskTolerance
+    riskTolerance,
+    strategyAllocationData = [],
+    categoryAllocationData = [],
+    benchmarkAllocationData = [],
+    benchmarkCategoryAllocationData = []
 }) => {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     // Refs to capture already-rendered charts from screen
@@ -392,6 +467,14 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                     Benchmark: benchmarkMap.get(date),
                 }));
 
+                // Calculate year tick positions (only January dates)
+                const yearTicks = chartData
+                    .map((d: { date: string; Portfolio: number; Benchmark: number }) => {
+                        const date = new Date(d.date);
+                        return date.getMonth() === 0 ? d.date : null;
+                    })
+                    .filter((date): date is string => date !== null);
+
                 const currencyFormatter = (value: number) => {
                     return new Intl.NumberFormat('en-US', {
                         style: 'currency',
@@ -402,30 +485,23 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 return (
                     <div className="space-y-4">
                         <PerformanceTable portfolio={reportData.portfolio} benchmark={reportData.benchmark} returnType={reportData.portfolio.returnType} />
-                        <div className="mt-4">
-                            {capturedCharts['growthChart'] ? (
-                                <div className="bg-white p-4 rounded-lg border border-gray-300 shadow-sm">
-                                    <div className="mb-3 pb-2 border-b border-[#003365]">
-                                        <h4 className="font-semibold text-base text-[#003365]">Growth of {formatCurrencyForTitle(investmentAmount)}</h4>
-                                        <p className="text-xs text-gray-600 mt-1">Historical performance comparison</p>
-                                    </div>
-                                    <div className="flex justify-center">
-                                        <img src={capturedCharts['growthChart']} alt="Growth Chart" className="max-w-full h-auto" style={{ maxHeight: '280px' }} />
-                                    </div>
+                        {capturedCharts['growthChart'] ? (
+                            <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
+                                {/* Removed redundant title wrapper - chart image already includes title from GrowthChart component */}
+                                <div className="flex justify-center">
+                                    <img src={capturedCharts['growthChart']} alt="Growth Chart" className="max-w-full h-auto" style={{ maxHeight: '380px' }} />
                                 </div>
-                            ) : (
-                                <div className="bg-white p-4 rounded-lg border border-gray-300 shadow-sm">
-                                    <div className="mb-3 pb-2 border-b border-[#003365]">
-                                        <h4 className="font-semibold text-base text-[#003365]">Growth of {formatCurrencyForTitle(investmentAmount)}</h4>
-                                        <p className="text-xs text-gray-600 mt-1">Historical performance comparison</p>
-                                    </div>
-                                    {/* Increased height and bottom margin for legend below */}
-                                    <div style={{ width: '100%', height: 320 }}>
+                            </div>
+                        ) : (
+                            <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
+                                {/* Removed redundant title wrapper - using inline chart without extra title */}
+                                {/* Reduced margins and padding to maximize chart size */}
+                                <div style={{ width: '100%', height: 400 }}>
                                         <LineChart 
                                             width={700} 
-                                            height={320} 
+                                            height={400} 
                                             data={chartData} 
-                                            margin={{ top: 10, right: 20, left: 10, bottom: 60 }} 
+                                            margin={{ top: 5, right: 5, left: 5, bottom: 50 }} 
                                             isAnimationActive={false}
                                         >
                                             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -434,57 +510,457 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                                                 tick={{ fontSize: 10, fill: '#6b7280' }} 
                                                 tickFormatter={(tick) => {
                                                     const date = new Date(tick);
+                                                    // Only show year for January (month 0)
                                                     if (date.getMonth() === 0) return date.getFullYear().toString();
                                                     return '';
                                                 }}
+                                                // Only show ticks for January dates (years only)
+                                                ticks={yearTicks.length > 0 ? yearTicks : undefined}
+                                                interval={0}
                                             />
                                             <YAxis 
-                                                tickFormatter={(value) => currencyFormatter(value)}
+                                                tickFormatter={(value) => {
+                                                    // Round to whole numbers with no decimals
+                                                    return new Intl.NumberFormat('en-US', {
+                                                        style: 'currency',
+                                                        currency: 'USD',
+                                                        minimumFractionDigits: 0,
+                                                        maximumFractionDigits: 0,
+                                                    }).format(Math.round(value));
+                                                }}
                                                 tick={{ fontSize: 10, fill: '#6b7280' }}
                                                 domain={['dataMin', 'dataMax']}
+                                                allowDecimals={false}
                                             />
                                             <Tooltip
                                                 formatter={(value: number) => currencyFormatter(value)}
                                                 labelFormatter={(label: string) => `Date: ${label}`}
                                                 contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '4px' }}
                                             />
-                                            {/* Legend positioned below chart, centered */}
+                                            {/* Legend positioned below chart, centered with reduced spacing */}
                                             <Legend 
                                                 verticalAlign="bottom" 
                                                 align="center"
-                                                wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
+                                                wrapperStyle={{ paddingTop: '10px', fontSize: '11px', color: '#4b5563' }}
                                                 iconType="line"
                                             />
-                                            <Line type="monotone" dataKey="Portfolio" stroke="#4a90e2" dot={false} strokeWidth={2} name={reportData.portfolio.name} />
-                                            <Line type="monotone" dataKey="Benchmark" stroke="#8884d8" dot={false} strokeWidth={2} name={reportData.benchmark.name} />
+                                            <Line type="monotone" dataKey="Portfolio" stroke="#003365" dot={false} strokeWidth={2} name={reportData.portfolio.name} />
+                                            <Line type="monotone" dataKey="Benchmark" stroke="#9ca3af" dot={false} strokeWidth={2} name={reportData.benchmark.name} />
                                         </LineChart>
                                     </div>
                                 </div>
                             )}
+                    </div>
+                );
+            };
+
+            // Combined component for Rolling Returns Chart and Drawdown Table on one page
+            const CombinedReturnsAndDrawdownPage: React.FC = () => {
+                return (
+                    <div className="space-y-6">
+                        {/* Rolling Returns Chart - first */}
+                        {capturedCharts['rollingReturnsChart'] ? (
+                            <CapturedChartImage 
+                                imageDataUrl={capturedCharts['rollingReturnsChart']} 
+                                title="Rolling 12-Month Returns Distribution" 
+                                showTitle={false} 
+                            />
+                        ) : (
+                            <RollingReturnsChart 
+                                portfolio={reportData.portfolio} 
+                                benchmark={reportData.benchmark} 
+                                isPdfMode={true} 
+                                showTitle={false} 
+                            />
+                        )}
+                        {/* Drawdown Table - second */}
+                        <div className="mt-6">
+                            <DrawdownTable 
+                                portfolio={reportData.portfolio} 
+                                benchmark={reportData.benchmark} 
+                            />
                         </div>
                     </div>
                 );
             };
 
+            // Pie chart colors - updated color scheme
+            const STRATEGY_COLORS = ['#003365', '#4a90e2', '#50e3c2', '#f5a623', '#10b981', '#8b5cf6'];
+            const CATEGORY_COLORS: { [key: string]: string } = {
+                'Equity': '#003365',
+                'Fixed Income': '#4a90e2',
+                'Alternatives': '#10b981',
+            };
+
+            // Component for allocation pie charts
+            const AllocationPieCharts: React.FC = () => {
+                // DEBUG: Log raw input data
+                console.log('=== PIE CHART DEBUG - RAW INPUT ===');
+                console.log('strategyAllocationData (raw):', JSON.stringify(strategyAllocationData, null, 2));
+                console.log('categoryAllocationData (raw):', JSON.stringify(categoryAllocationData, null, 2));
+                
+                // Filter out zero or very small values to ensure accurate rendering
+                const filteredStrategyData = strategyAllocationData.filter(item => item.value > 0.01);
+                const filteredCategoryData = categoryAllocationData.filter(item => item.value > 0.01);
+                
+                // DEBUG: Log filtered data
+                console.log('=== PIE CHART DEBUG - FILTERED ===');
+                console.log('filteredStrategyData:', JSON.stringify(filteredStrategyData, null, 2));
+                console.log('filteredStrategyData.length:', filteredStrategyData.length);
+                console.log('filteredCategoryData:', JSON.stringify(filteredCategoryData, null, 2));
+                console.log('filteredCategoryData.length:', filteredCategoryData.length);
+                
+                // Special case: if only one item, create simple 100% data without normalization
+                let normalizedStrategyData: { name: string; value: number }[];
+                let normalizedCategoryData: { name: string; value: number }[];
+                
+                if (filteredStrategyData.length === 1) {
+                    // Single item - set to exactly 100% without any processing
+                    normalizedStrategyData = [{ ...filteredStrategyData[0], value: 100 }];
+                    console.log('=== PIE CHART DEBUG - SINGLE STRATEGY ===');
+                    console.log('Single strategy detected, setting to 100%');
+                    console.log('normalizedStrategyData:', JSON.stringify(normalizedStrategyData, null, 2));
+                } else {
+                    // Multiple items - normalize data to ensure percentages sum to exactly 100%
+                    const normalizeData = (data: { name: string; value: number }[]) => {
+                        if (data.length === 0) return [];
+                        const total = data.reduce((sum, item) => sum + item.value, 0);
+                        if (total === 0) return [];
+                        
+                        // Check if data is already in percentage format (sums to ~100)
+                        const isPercentageFormat = Math.abs(total - 100) < 0.1;
+                        
+                        let normalized: { name: string; value: number }[];
+                        
+                        if (isPercentageFormat) {
+                            // Data is already in percentage format, just ensure it sums to exactly 100
+                            normalized = data.map(item => ({
+                                ...item,
+                                value: item.value
+                            }));
+                        } else {
+                            // Data is in decimal format (0-1), normalize to percentage
+                            normalized = data.map(item => ({
+                                ...item,
+                                value: (item.value / total) * 100
+                            }));
+                        }
+                        
+                        // Ensure the sum is exactly 100.0 by adjusting the largest value
+                        const sum = normalized.reduce((s, item) => s + item.value, 0);
+                        const diff = 100 - sum;
+                        
+                        if (Math.abs(diff) > 0.0001 && normalized.length > 0) {
+                            // Add the difference to the largest value to make sum exactly 100
+                            const largestIndex = normalized.reduce((maxIdx, item, idx) => 
+                                item.value > normalized[maxIdx].value ? idx : maxIdx, 0
+                            );
+                            normalized[largestIndex].value = normalized[largestIndex].value + diff;
+                        }
+                        
+                        // Round to 2 decimal places for display, but keep precision for calculation
+                        return normalized.map(item => ({
+                            ...item,
+                            value: Math.round(item.value * 100) / 100
+                        }));
+                    };
+                    
+                    normalizedStrategyData = normalizeData(filteredStrategyData);
+                }
+                
+                if (filteredCategoryData.length === 1) {
+                    // Single item - set to exactly 100% without any processing
+                    normalizedCategoryData = [{ ...filteredCategoryData[0], value: 100 }];
+                    console.log('=== PIE CHART DEBUG - SINGLE CATEGORY ===');
+                    console.log('Single category detected, setting to 100%');
+                    console.log('normalizedCategoryData:', JSON.stringify(normalizedCategoryData, null, 2));
+                } else {
+                    // Multiple items - normalize data to ensure percentages sum to exactly 100%
+                    const normalizeData = (data: { name: string; value: number }[]) => {
+                        if (data.length === 0) return [];
+                        const total = data.reduce((sum, item) => sum + item.value, 0);
+                        if (total === 0) return [];
+                        
+                        // Check if data is already in percentage format (sums to ~100)
+                        const isPercentageFormat = Math.abs(total - 100) < 0.1;
+                        
+                        let normalized: { name: string; value: number }[];
+                        
+                        if (isPercentageFormat) {
+                            // Data is already in percentage format, just ensure it sums to exactly 100
+                            normalized = data.map(item => ({
+                                ...item,
+                                value: item.value
+                            }));
+                        } else {
+                            // Data is in decimal format (0-1), normalize to percentage
+                            normalized = data.map(item => ({
+                                ...item,
+                                value: (item.value / total) * 100
+                            }));
+                        }
+                        
+                        // Ensure the sum is exactly 100.0 by adjusting the largest value
+                        const sum = normalized.reduce((s, item) => s + item.value, 0);
+                        const diff = 100 - sum;
+                        
+                        if (Math.abs(diff) > 0.0001 && normalized.length > 0) {
+                            // Add the difference to the largest value to make sum exactly 100
+                            const largestIndex = normalized.reduce((maxIdx, item, idx) => 
+                                item.value > normalized[maxIdx].value ? idx : maxIdx, 0
+                            );
+                            normalized[largestIndex].value = normalized[largestIndex].value + diff;
+                        }
+                        
+                        // Round to 2 decimal places for display, but keep precision for calculation
+                        return normalized.map(item => ({
+                            ...item,
+                            value: Math.round(item.value * 100) / 100
+                        }));
+                    };
+                    
+                    normalizedCategoryData = normalizeData(filteredCategoryData);
+                }
+                
+                // Final verification: ensure all sums are exactly 100
+                const ensureExactSum = (data: { name: string; value: number }[]) => {
+                    if (data.length === 0) return data;
+                    const sum = data.reduce((s, item) => s + item.value, 0);
+                    const diff = 100 - sum;
+                    if (Math.abs(diff) > 0.0001) {
+                        // Find the largest value and adjust it
+                        const largestIdx = data.reduce((maxIdx, item, idx) => 
+                            item.value > data[maxIdx].value ? idx : maxIdx, 0
+                        );
+                        const newData = [...data];
+                        newData[largestIdx] = {
+                            ...newData[largestIdx],
+                            value: newData[largestIdx].value + diff
+                        };
+                        return newData;
+                    }
+                    return data;
+                };
+                
+                // Only apply ensureExactSum for multi-item cases (single items are already at 100%)
+                if (normalizedStrategyData.length > 1) {
+                    normalizedStrategyData = ensureExactSum(normalizedStrategyData);
+                }
+                if (normalizedCategoryData.length > 1) {
+                    normalizedCategoryData = ensureExactSum(normalizedCategoryData);
+                }
+                
+                if (normalizedStrategyData.length === 0 && normalizedCategoryData.length === 0) {
+                    return null;
+                }
+
+                // Debug logging with detailed verification
+                const finalStrategySum = normalizedStrategyData.reduce((sum, item) => sum + item.value, 0);
+                const finalCategorySum = normalizedCategoryData.reduce((sum, item) => sum + item.value, 0);
+                
+                console.log('=== PIE CHART DEBUG - FINAL DATA ===');
+                console.log('normalizedStrategyData (FINAL):', JSON.stringify(normalizedStrategyData, null, 2));
+                console.log('strategySum:', finalStrategySum);
+                console.log('strategySumIs100:', Math.abs(finalStrategySum - 100) < 0.01);
+                console.log('normalizedCategoryData (FINAL):', JSON.stringify(normalizedCategoryData, null, 2));
+                console.log('categorySum:', finalCategorySum);
+                console.log('categorySumIs100:', Math.abs(finalCategorySum - 100) < 0.01);
+                console.log('=== END PIE CHART DEBUG ===');
+                
+                // Final safety check: if sum is not 100, force it
+                if (Math.abs(finalStrategySum - 100) > 0.01 && normalizedStrategyData.length > 0) {
+                    console.warn('Strategy data sum is not 100:', finalStrategySum, 'Adjusting...');
+                    const diff = 100 - finalStrategySum;
+                    const largestIdx = normalizedStrategyData.reduce((maxIdx, item, idx) => 
+                        item.value > normalizedStrategyData[maxIdx].value ? idx : maxIdx, 0
+                    );
+                    normalizedStrategyData[largestIdx].value += diff;
+                }
+                
+                if (Math.abs(finalCategorySum - 100) > 0.01 && normalizedCategoryData.length > 0) {
+                    console.warn('Category data sum is not 100:', finalCategorySum, 'Adjusting...');
+                    const diff = 100 - finalCategorySum;
+                    const largestIdx = normalizedCategoryData.reduce((maxIdx, item, idx) => 
+                        item.value > normalizedCategoryData[maxIdx].value ? idx : maxIdx, 0
+                    );
+                    normalizedCategoryData[largestIdx].value += diff;
+                }
+
+                const RADIAN = Math.PI / 180;
+                const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                    if (percent < 0.05) return null;
+                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                    return (
+                        <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="8" fontWeight="bold">
+                            {`${(percent * 100).toFixed(0)}%`}
+                        </text>
+                    );
+                };
+
+                return (
+                    <div className="space-y-4">
+                        {/* Portfolio Allocation */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-3">
+                            <div className="mb-2 pb-1 border-b border-gray-200">
+                                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Portfolio Allocation</h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Strategy Allocation Chart */}
+                                {normalizedStrategyData.length > 0 && (
+                                    <div>
+                                        <h4 className="text-xs font-medium text-gray-700 mb-2 text-center" style={{ fontSize: '0.75rem' }}>By Strategy</h4>
+                                        <div style={{ width: '100%', height: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                            <PieChart width={200} height={120}>
+                                                {(() => {
+                                                    // Recharts has a known issue with single-item pie charts - add a tiny placeholder
+                                                    // to force proper rendering of a full circle
+                                                    const pieData = normalizedStrategyData.length === 1 
+                                                        ? [
+                                                            { name: normalizedStrategyData[0].name, value: 99.99 },
+                                                            { name: '__placeholder__', value: 0.01 }
+                                                          ]
+                                                        : normalizedStrategyData;
+                                                    return (
+                                                        <Pie
+                                                            data={pieData}
+                                                            cx={50}
+                                                            cy={60}
+                                                            labelLine={false}
+                                                            label={normalizedStrategyData.length === 1 ? null : renderLabel}
+                                                            outerRadius={38}
+                                                            innerRadius={0}
+                                                            fill="#8884d8"
+                                                            dataKey="value"
+                                                            isAnimationActive={false}
+                                                            startAngle={normalizedStrategyData.length === 1 ? 90 : 270}
+                                                            endAngle={normalizedStrategyData.length === 1 ? -270 : -90}
+                                                        >
+                                                            {pieData.map((entry, index) => (
+                                                                <Cell 
+                                                                    key={`cell-${index}`} 
+                                                                    fill={
+                                                                        entry.name === '__placeholder__' 
+                                                                            ? 'transparent' 
+                                                                            : STRATEGY_COLORS[index % STRATEGY_COLORS.length]
+                                                                    } 
+                                                                />
+                                                            ))}
+                                                        </Pie>
+                                                    );
+                                                })()}
+                                                <Tooltip
+                                                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                                                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                                                />
+                                                <Legend 
+                                                    verticalAlign="middle" 
+                                                    align="right"
+                                                    wrapperStyle={{ fontSize: '9px', color: '#4b5563', paddingLeft: '15px', width: '100px' }}
+                                                    iconSize={6}
+                                                />
+                                            </PieChart>
+                                        </div>
+                                    </div>
+                                )}
+                                {/* Category Allocation Chart */}
+                                {normalizedCategoryData.length > 0 && (
+                                    <div>
+                                        <h4 className="text-xs font-medium text-gray-700 mb-2 text-center" style={{ fontSize: '0.75rem' }}>By Asset Category</h4>
+                                        <div style={{ width: '100%', height: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                            <PieChart width={200} height={120}>
+                                                {(() => {
+                                                    // Recharts has a known issue with single-item pie charts - add a tiny placeholder
+                                                    // to force proper rendering of a full circle
+                                                    const pieData = normalizedCategoryData.length === 1 
+                                                        ? [
+                                                            { name: normalizedCategoryData[0].name, value: 99.99 },
+                                                            { name: '__placeholder__', value: 0.01 }
+                                                          ]
+                                                        : normalizedCategoryData;
+                                                    return (
+                                                        <Pie
+                                                            data={pieData}
+                                                            cx={50}
+                                                            cy={60}
+                                                            labelLine={false}
+                                                            label={normalizedCategoryData.length === 1 ? null : renderLabel}
+                                                            outerRadius={38}
+                                                            innerRadius={0}
+                                                            fill="#8884d8"
+                                                            dataKey="value"
+                                                            isAnimationActive={false}
+                                                            startAngle={normalizedCategoryData.length === 1 ? 90 : 270}
+                                                            endAngle={normalizedCategoryData.length === 1 ? -270 : -90}
+                                                        >
+                                                            {pieData.map((entry, index) => (
+                                                                <Cell 
+                                                                    key={`cell-${index}`} 
+                                                                    fill={
+                                                                        entry.name === '__placeholder__' 
+                                                                            ? 'transparent' 
+                                                                            : (CATEGORY_COLORS[entry.name] || STRATEGY_COLORS[index % STRATEGY_COLORS.length])
+                                                                    } 
+                                                                />
+                                                            ))}
+                                                        </Pie>
+                                                    );
+                                                })()}
+                                                <Tooltip
+                                                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                                                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '10px' }}
+                                                />
+                                                <Legend 
+                                                    verticalAlign="middle" 
+                                                    align="right"
+                                                    wrapperStyle={{ fontSize: '9px', color: '#4b5563', paddingLeft: '15px', width: '100px' }}
+                                                    iconSize={6}
+                                                />
+                                            </PieChart>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Combined component for Executive Summary and Client Variables
+            const ExecutiveSummaryWithClientInfo: React.FC = () => {
+                return (
+                    <div className="space-y-6">
+                        {/* 1. Client Information - First */}
+                        <ClientVariables
+                            clientName={clientName}
+                            investmentAmount={investmentAmount}
+                            clientAge={clientAge}
+                            annualDistribution={annualDistribution}
+                            riskTolerance={riskTolerance}
+                            adviserName={adviserName}
+                        />
+                        {/* 2. Allocation Pie Charts - Second */}
+                        <AllocationPieCharts />
+                        {/* 3. AI Summary - Third */}
+                        {aiSummary && <SummaryForPdf summary={aiSummary} />}
+                    </div>
+                );
+            };
+
             const reportPageComponents = [
-                aiSummary ? {
+                // Always show Executive Summary page (with or without AI summary) to include client variables
+                {
                     title: 'Executive Summary',
-                    component: <SummaryForPdf summary={aiSummary} />
-                } : null,
+                    component: <ExecutiveSummaryWithClientInfo />
+                },
                 {
                     title: 'Performance Analysis',
                     component: <CombinedPerformancePage />
                 },
                 {
-                    title: 'Largest Drawdown Analysis',
-                    component: <DrawdownTable portfolio={reportData.portfolio} benchmark={reportData.benchmark} />
-                },
-                {
-                    title: 'Rolling 12-Month Returns Analysis',
-                    // Use captured image if available, otherwise fall back to rendering
-                    component: capturedCharts['rollingReturnsChart']
-                        ? <CapturedChartImage imageDataUrl={capturedCharts['rollingReturnsChart']} title="Rolling 12-Month Returns Distribution" />
-                        : <RollingReturnsChart portfolio={reportData.portfolio} benchmark={reportData.benchmark} isPdfMode={true} />
+                    title: 'Returns & Drawdown Analysis',
+                    component: <CombinedReturnsAndDrawdownPage />
                 },
                 (reportData.portfolio.distributionAnalysis || reportData.benchmark.distributionAnalysis) ? {
                     title: 'Monte Carlo Simulation Analysis',

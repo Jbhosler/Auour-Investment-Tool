@@ -21,6 +21,7 @@ export interface Benchmark {
     id: string;
     name: string;
     returns: MonthlyReturn[];
+    assetAllocation?: AssetAllocation; // Optional, for benchmarks that have asset allocation
 }
 
 export interface Allocation {

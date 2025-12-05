@@ -34,19 +34,19 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
 
     return (
         <div>
-            <div className="mb-5 pb-2 border-b border-[#003365]">
-                <h4 className="font-semibold text-lg text-[#003365]">Key Performance Metrics</h4>
-                <p className="text-sm text-gray-600 mt-1">Comparative analysis of portfolio vs. benchmark</p>
+            <div className="mb-4 pb-2 border-b border-gray-200">
+                <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Key Performance Metrics</h4>
+                <p className="text-sm text-gray-500 mt-1" style={{ fontSize: '0.8rem' }}>Comparative analysis of portfolio vs. benchmark</p>
             </div>
-            {/* Lighter border, subtle shadow */}
-            <div className="overflow-hidden rounded-lg border border-gray-300 shadow-sm">
+            {/* Lighter border, no shadow for cleaner look */}
+            <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-sm text-left">
-                    {/* Lighter header - subtle gradient instead of heavy dark */}
+                    {/* Lighter header - subtle gradient, reduced opacity */}
                     <thead className="bg-gradient-to-r from-[#003365] to-[#003d6b] text-white">
                         <tr>
-                            <th scope="col" className="px-5 py-3 font-medium uppercase tracking-wide text-xs">Metric</th>
-                            <th scope="col" className="px-5 py-3 text-right font-medium uppercase tracking-wide text-xs truncate" title={portfolio.name}>{portfolio.name}</th>
-                            <th scope="col" className="px-5 py-3 text-right font-medium uppercase tracking-wide text-xs truncate" title={benchmark.name}>{benchmark.name}</th>
+                            <th scope="col" className="px-4 py-2.5 font-medium uppercase tracking-wide" style={{ fontSize: '0.7rem' }}>Metric</th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={portfolio.name}>{portfolio.name}</th>
+                            <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={benchmark.name}>{benchmark.name}</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
@@ -64,16 +64,16 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
                             return (
                                 <tr 
                                     key={metricKey} 
-                                    className={`border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                    className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                 >
-                                    <td className="px-5 py-3.5 font-medium text-gray-700">{metricLabels[metricKey]}</td>
-                                    <td className={`px-5 py-3.5 text-right font-mono text-sm ${outperforms ? 'text-green-700 font-semibold' : 'text-gray-800'}`}>
+                                    <td className="px-4 py-3 font-medium text-gray-600" style={{ fontSize: '0.85rem' }}>{metricLabels[metricKey]}</td>
+                                    <td className={`px-4 py-3 text-right font-mono ${outperforms ? 'text-green-700 font-semibold' : 'text-gray-700'}`} style={{ fontSize: '0.85rem' }}>
                                         {metricKey === 'volatility' ? formatPercent(portfolioValue) : formatPercent(portfolioValue)}
                                         {outperforms && portfolioValue !== null && benchmarkValue !== null && (
-                                            <span className="ml-2 text-green-600 text-xs">↑</span>
+                                            <span className="ml-2 text-green-600" style={{ fontSize: '0.75rem' }}>↑</span>
                                         )}
                                     </td>
-                                    <td className="px-5 py-3.5 text-right font-mono text-sm text-gray-800">
+                                    <td className="px-4 py-3 text-right font-mono text-gray-700" style={{ fontSize: '0.85rem' }}>
                                         {metricKey === 'volatility' ? formatPercent(benchmarkValue) : formatPercent(benchmarkValue)}
                                     </td>
                                 </tr>

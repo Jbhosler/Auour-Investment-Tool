@@ -45,10 +45,10 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
              <h2 className="text-xl font-semibold mb-4 border-b pb-2">Portfolio Allocation</h2>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
+             <div className="flex flex-col gap-8 mt-4">
                  <div>
                     <h3 className="text-lg font-medium text-center mb-2">By Strategy</h3>
-                    <div style={{ width: '100%', height: 250 }}>
+                    <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
                             <PieChart>
                                 <Pie
@@ -58,6 +58,7 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
                                     labelLine={false}
                                     label={renderCustomizedLabel}
                                     outerRadius={80}
+                                    innerRadius={0}
                                     fill="#8884d8"
                                     dataKey="value"
                                     nameKey="name"
@@ -67,14 +68,14 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
                                     ))}
                                 </Pie>
                                 <Tooltip content={<CustomTooltip />} />
-                                <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{fontSize: '11px', paddingLeft: '10px'}} iconSize={8} />
+                                <Legend layout="horizontal" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '11px', paddingTop: '10px'}} iconSize={8} />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
                  <div>
                     <h3 className="text-lg font-medium text-center mb-2">By Asset Category</h3>
-                    <div style={{ width: '100%', height: 250 }}>
+                    <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
                             <PieChart>
                                 <Pie
@@ -84,6 +85,7 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
                                     labelLine={false}
                                     label={renderCustomizedLabel}
                                     outerRadius={80}
+                                    innerRadius={0}
                                     fill="#8884d8"
                                     dataKey="value"
                                     nameKey="name"
@@ -93,7 +95,7 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
                                     ))}
                                 </Pie>
                                 <Tooltip content={<CustomTooltip />} />
-                                <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{fontSize: '11px', paddingLeft: '10px'}} iconSize={8} />
+                                <Legend layout="horizontal" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '11px', paddingTop: '10px'}} iconSize={8} />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>

@@ -30,53 +30,49 @@ const TitlePage: React.FC<TitlePageProps> = ({ firmLogo, portfolioName, adviserN
     };
 
     return (
-        <div className="w-full h-full flex bg-white text-gray-800 font-sans">
-            {/* Left Accent Panel - lighter, more minimal */}
-            <div className="w-1/4 bg-gradient-to-b from-[#003365] to-[#002a52] relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-24 h-24 border-2 border-white/15 rounded-full"></div>
-                </div>
-                {firmLogo && (
-                    <div className="absolute top-12 left-1/2 transform -translate-x-1/2 w-28 h-14 bg-white p-2 rounded shadow-md">
-                        <img src={firmLogo} alt="Firm Logo" className="max-w-full max-h-full object-contain" />
-                    </div>
-                )}
-            </div>
+        <div className="w-full h-full flex bg-white text-gray-700 font-sans" style={{ minHeight: '297mm' }}>
+            {/* Left Accent Line - thin vertical line */}
+            <div className="w-1 bg-[#003365]" style={{ minHeight: '297mm' }}></div>
 
-            {/* Main Content Area - lighter background, better spacing for A4 */}
-            <div className="w-3/4 flex flex-col justify-between p-16 bg-white">
-                {/* Header Section */}
-                <header className="w-full">
+            {/* Main Content Area - lighter background, better spacing for A4, ensure no clipping */}
+            <div className="flex-1 flex flex-col justify-between px-12 py-10 bg-white" style={{ minHeight: '297mm' }}>
+                {/* Header Section - reduced height to prevent clipping */}
+                <header className="w-full" style={{ minHeight: '60px', maxHeight: '80px' }}>
+                    {firmLogo && (
+                        <div className="w-48 h-16 mb-4">
+                            <img src={firmLogo} alt="Firm Logo" className="max-w-full max-h-full object-contain" />
+                        </div>
+                    )}
                     {!firmLogo && (
-                        <div className="w-48 h-20"></div>
+                        <div className="w-48 h-16"></div>
                     )}
                 </header>
 
-                {/* Body Section - ensure no clipping with max-width and wrapping */}
-                <main className="w-full flex-1 flex flex-col justify-center">
-                    <div className="mb-10">
-                        {/* Reduced font size slightly and added max-width to prevent clipping on A4 */}
-                        <h1 className="text-5xl font-serif text-[#003365] tracking-tight font-bold leading-tight max-w-full break-words">
+                {/* Body Section - ensure no clipping with max-width and wrapping, centered vertically */}
+                <main className="w-full flex-1 flex flex-col justify-center" style={{ paddingTop: '20px', paddingBottom: '20px' }}>
+                    <div className="mb-8">
+                        {/* Reduced font size for A4 safety, ensures no clipping even with html2canvas scaling */}
+                        <h1 className="font-serif text-[#003365] tracking-tight font-bold leading-tight max-w-full break-words" style={{ fontSize: '2.5rem', lineHeight: '1.2' }}>
                             Investment Proposal
                         </h1>
-                        <div className="w-20 h-0.5 bg-[#003365] mt-5"></div>
+                        <div className="w-16 h-px bg-[#003365] mt-4"></div>
                     </div>
-                    {/* Ensure subtitle wraps gracefully and doesn't clip */}
-                    <h2 className="text-2xl font-light text-gray-600 mt-6 mb-4 max-w-full break-words leading-relaxed">
+                    {/* Ensure subtitle wraps gracefully and doesn't clip, reduced size */}
+                    <h2 className="font-light text-gray-600 mt-4 mb-3 max-w-full break-words leading-relaxed" style={{ fontSize: '1.5rem', lineHeight: '1.5' }}>
                         {clientName ? `A scenario for ${clientName}.` : portfolioName}
                     </h2>
                     {adviserName && (
-                        <p className="text-lg font-light text-gray-500 mb-12 max-w-full break-words">
+                        <p className="font-light text-gray-500 mb-8 max-w-full break-words" style={{ fontSize: '1rem', lineHeight: '1.6' }}>
                             Prepared for {adviserName}.
                         </p>
                     )}
-                    {!adviserName && <div className="mb-12"></div>}
+                    {!adviserName && <div className="mb-8"></div>}
                 </main>
 
-                {/* Footer Section - lighter text colors */}
-                <footer className="w-full text-left mt-auto">
-                    <p className="text-base text-gray-500">{today}</p>
-                    <p className="text-xs text-gray-400 mt-4 italic max-w-3xl leading-relaxed">
+                {/* Footer Section - lighter text colors, fixed height to prevent overlap */}
+                <footer className="w-full text-left mt-auto" style={{ minHeight: '100px', maxHeight: '120px' }}>
+                    <p className="text-gray-500" style={{ fontSize: '0.9rem', marginBottom: '8px' }}>{today}</p>
+                    <p className="text-gray-400 italic max-w-full leading-relaxed" style={{ fontSize: '0.7rem', lineHeight: '1.5' }}>
                         This document is for informational purposes only and does not constitute an offer or solicitation to buy or sell any security. Past performance is not indicative of future results. All investments involve risk, including the possible loss of principal. Please consult with your financial adviser before making any investment decisions. This scenario was run utilizing actual composite returns for the strategies.
                     </p>
                 </footer>

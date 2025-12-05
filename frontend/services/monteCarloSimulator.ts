@@ -17,7 +17,7 @@ export const runMonteCarloSimulation = (
     annualDistribution: number,
     meanAnnualReturn: number,
     annualVolatility: number,
-    numSimulations = 100
+    numSimulations = 250
 ): DistributionAnalysis | null => {
     if (clientAge >= targetAge || initialInvestment <= 0 || annualDistribution <= 0 || clientAge <= 0) {
         return null;

@@ -6,9 +6,10 @@ interface RollingReturnsChartProps {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
     isPdfMode?: boolean;
+    showTitle?: boolean; // Allow title to be hidden when used in contexts with existing titles
 }
 
-const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, benchmark, isPdfMode = false }) => {
+const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, benchmark, isPdfMode = false, showTitle = true }) => {
 
     const mergedData = useMemo(() => {
         const allKeys = new Set([
@@ -31,44 +32,46 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
 
 
     return (
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <div className="mb-4 pb-2 border-b border-[#003365]">
-                <h4 className="font-semibold text-lg text-[#003365]">Rolling 12-Month Returns Distribution</h4>
-                <p className="text-sm text-gray-600 mt-1">Frequency analysis of monthly returns</p>
-            </div>
-            {/* Lighter styling for stats section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 text-sm mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="border-b md:border-b-0 md:border-r border-gray-200 pr-4 pb-2 md:pb-0 mb-2 md:mb-0">
-                    <p className="font-medium text-gray-700 truncate" title={portfolio.name}>{portfolio.name}</p>
-                    <div className="flex justify-between mt-1">
-                        <span className="text-gray-600">Positive Periods:</span>
-                        <span className="text-green-600 font-semibold">{portfolio.rollingReturnsAnalysis.percentPositive.toFixed(1)}%</span>
+        <div className="bg-white px-0 py-0 rounded-lg">
+            {showTitle && (
+                <div className="mb-1 pb-1 border-b border-gray-200 px-2 pt-1">
+                    <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Rolling 12-Month Returns Distribution</h4>
+                    <p className="text-sm text-gray-500 mt-0.5" style={{ fontSize: '0.8rem' }}>Frequency analysis of monthly returns</p>
+                </div>
+            )}
+            {/* Lighter styling for stats section with adequate padding to prevent cutoff */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 text-sm mb-1 p-2.5 pb-3 bg-gray-50 rounded-lg border border-gray-200 mx-0">
+                <div className="border-b md:border-b-0 md:border-r border-gray-200 pr-3 pb-2.5 md:pb-0 mb-2 md:mb-0">
+                    <p className="font-medium text-gray-700 break-words" title={portfolio.name} style={{ fontSize: '0.85rem', marginBottom: '8px' }}>{portfolio.name}</p>
+                    <div className="flex justify-between mt-1.5">
+                        <span className="text-gray-600" style={{ fontSize: '0.8rem' }}>Positive Periods:</span>
+                        <span className="text-green-600 font-semibold" style={{ fontSize: '0.8rem' }}>{portfolio.rollingReturnsAnalysis.percentPositive.toFixed(1)}%</span>
                     </div>
-                     <div className="flex justify-between mt-1">
-                        <span className="text-gray-600">Negative Periods:</span>
-                        <span className="text-red-600 font-semibold">{portfolio.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
+                     <div className="flex justify-between mt-1.5">
+                        <span className="text-gray-600" style={{ fontSize: '0.8rem' }}>Negative Periods:</span>
+                        <span className="text-red-600 font-semibold" style={{ fontSize: '0.8rem' }}>{portfolio.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
                     </div>
                 </div>
-                 <div>
-                    <p className="font-medium text-gray-700 truncate" title={benchmark.name}>{benchmark.name}</p>
-                    <div className="flex justify-between mt-1">
-                        <span className="text-gray-600">Positive Periods:</span>
-                        <span className="text-green-600 font-semibold">{benchmark.rollingReturnsAnalysis.percentPositive.toFixed(1)}%</span>
+                 <div className="pl-2">
+                    <p className="font-medium text-gray-700 break-words" title={benchmark.name} style={{ fontSize: '0.85rem', marginBottom: '8px' }}>{benchmark.name}</p>
+                    <div className="flex justify-between mt-1.5">
+                        <span className="text-gray-600" style={{ fontSize: '0.8rem' }}>Positive Periods:</span>
+                        <span className="text-green-600 font-semibold" style={{ fontSize: '0.8rem' }}>{benchmark.rollingReturnsAnalysis.percentPositive.toFixed(1)}%</span>
                     </div>
-                     <div className="flex justify-between mt-1">
-                        <span className="text-gray-600">Negative Periods:</span>
-                        <span className="text-red-600 font-semibold">{benchmark.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
+                     <div className="flex justify-between mt-1.5">
+                        <span className="text-gray-600" style={{ fontSize: '0.8rem' }}>Negative Periods:</span>
+                        <span className="text-red-600 font-semibold" style={{ fontSize: '0.8rem' }}>{benchmark.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
                     </div>
                 </div>
             </div>
-            {/* Increased height and bottom margin to accommodate legend below */}
-            <div style={{ width: isPdfMode ? '700px' : '100%', height: isPdfMode ? 380 : 400 }} className="mt-6">
+            {/* Reduced margins and padding to maximize chart size, with adequate bottom margin for legend and angled labels */}
+            <div style={{ width: '100%', height: isPdfMode ? 400 : 400 }} className="mt-0 px-0">
                 {isPdfMode ? (
                     <BarChart 
-                        width={700} 
-                        height={380} 
+                        width={690} 
+                        height={400} 
                         data={mergedData} 
-                        margin={{ top: 10, right: 20, left: 10, bottom: 60 }} 
+                        margin={{ top: 5, right: 0, left: 0, bottom: 85 }} 
                         isAnimationActive={false}
                     >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -81,7 +84,7 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                             interval={0}
                         />
                         <YAxis 
-                            label={{ value: 'Frequency (Months)', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle', fill: '#6b7280', fontSize: '11px' } }} 
+                            label={{ value: 'Frequency (Months)', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle', fill: '#6b7280', fontSize: '10px' } }} 
                             allowDecimals={false}
                             tick={{ fontSize: 10, fill: '#6b7280' }}
                         />
@@ -90,20 +93,20 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                             labelFormatter={(label: string) => `Return Range: ${label}`}
                             contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '4px' }}
                         />
-                        {/* Legend positioned below chart, centered */}
+                        {/* Legend positioned below chart, centered with adequate spacing to prevent cutoff */}
                         <Legend 
                             verticalAlign="bottom" 
                             align="center"
-                            wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
+                            wrapperStyle={{ paddingTop: '10px', fontSize: '11px', color: '#4b5563' }}
                         />
-                        <Bar dataKey="Portfolio" fill="#4a90e2" name={portfolio.name} />
-                        <Bar dataKey="Benchmark" fill="#8884d8" name={benchmark.name} />
+                        <Bar dataKey="Portfolio" fill="#003365" name={portfolio.name} />
+                        <Bar dataKey="Benchmark" fill="#9ca3af" name={benchmark.name} />
                     </BarChart>
                 ) : (
                     <ResponsiveContainer>
                         <BarChart 
                             data={mergedData} 
-                            margin={{ top: 10, right: 20, left: 10, bottom: 60 }} 
+                            margin={{ top: 5, right: 0, left: 0, bottom: 85 }} 
                             isAnimationActive={!isPdfMode}
                         >
                             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -116,7 +119,7 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                                 interval={0}
                             />
                             <YAxis 
-                                label={{ value: 'Frequency (Months)', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle', fill: '#6b7280', fontSize: '11px' } }} 
+                                label={{ value: 'Frequency (Months)', angle: -90, position: 'insideLeft', offset: 10, style: { textAnchor: 'middle', fill: '#6b7280', fontSize: '10px' } }} 
                                 allowDecimals={false}
                                 tick={{ fontSize: 10, fill: '#6b7280' }}
                             />
@@ -125,14 +128,14 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                                 labelFormatter={(label: string) => `Return Range: ${label}`}
                                 contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '4px' }}
                             />
-                            {/* Legend positioned below chart, centered */}
+                            {/* Legend positioned below chart, centered with adequate spacing to prevent cutoff */}
                             <Legend 
                                 verticalAlign="bottom" 
                                 align="center"
-                                wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
+                                wrapperStyle={{ paddingTop: '10px', fontSize: '11px', color: '#4b5563' }}
                             />
-                            <Bar dataKey="Portfolio" fill="#4a90e2" name={portfolio.name} />
-                            <Bar dataKey="Benchmark" fill="#8884d8" name={benchmark.name} />
+                            <Bar dataKey="Portfolio" fill="#003365" name={portfolio.name} />
+                            <Bar dataKey="Benchmark" fill="#9ca3af" name={benchmark.name} />
                         </BarChart>
                     </ResponsiveContainer>
                 )}

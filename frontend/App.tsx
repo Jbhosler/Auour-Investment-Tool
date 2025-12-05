@@ -33,7 +33,8 @@ const App: React.FC = () => {
     const [settings, updateSettings, settingsState] = useSettingsState();
 
     const [portfolioAllocations, setPortfolioAllocations] = useState<Allocation[]>([]);
-    const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('b1');
+    const [benchmarkAllocations, setBenchmarkAllocations] = useState<Allocation[]>([]);
+    const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('b1'); // Keep for backward compatibility, but will use benchmarkAllocations if available
     const [reportData, setReportData] = useState<ReportData | null>(null);
     const [aiSummary, setAiSummary] = useState<string>('');
 
@@ -63,9 +64,24 @@ useEffect(() => {
     }
 }, [strategies, portfolioAllocations.length]); // Added .length to dependency for safety
 
+    // Initialize benchmark allocations when benchmarks load
+    useEffect(() => {
+        if (benchmarks.length > 0 && benchmarkAllocations.length === 0) {
+            // Default to 100% to first benchmark
+            setBenchmarkAllocations([
+                { strategyId: benchmarks[0].id, weight: 100 }
+            ]);
+        }
+    }, [benchmarks, benchmarkAllocations.length]);
+
     const totalAllocation = useMemo(() => 
         portfolioAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0), 
         [portfolioAllocations]
+    );
+
+    const totalBenchmarkAllocation = useMemo(() => 
+        benchmarkAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0), 
+        [benchmarkAllocations]
     );
 
     const benchmarkMetricsMap = useMemo(() => {
@@ -173,7 +189,8 @@ useEffect(() => {
                     name: strategy ? strategy.name : 'Unknown Strategy',
                     value: alloc.weight,
                 };
-            });
+            })
+            .filter(item => item.value > 0.01); // Filter out zero or very small allocations
     }, [portfolioAllocations, strategies]);
 
     const categoryAllocationData = useMemo(() => {
@@ -198,9 +215,49 @@ useEffect(() => {
             .filter(item => item.value > 0.01);
     }, [portfolioAllocations, strategies]);
 
+    // Benchmark allocation data (similar to strategy allocation data)
+    const benchmarkAllocationData = useMemo(() => {
+        return benchmarkAllocations
+            .map(alloc => {
+                const benchmark = benchmarks.find(b => b.id === alloc.strategyId);
+                return {
+                    name: benchmark ? benchmark.name : 'Unknown Benchmark',
+                    value: alloc.weight,
+                };
+            })
+            .filter(item => item.value > 0.01); // Filter out zero or very small allocations
+    }, [benchmarkAllocations, benchmarks]);
+
+    const benchmarkCategoryAllocationData = useMemo(() => {
+        const totals: { [key: string]: number } = {
+            'Equity': 0,
+            'Fixed Income': 0,
+            'Alternatives': 0,
+        };
+
+        benchmarkAllocations.forEach(alloc => {
+            const benchmark = benchmarks.find(b => b.id === alloc.strategyId);
+            if (benchmark && benchmark.assetAllocation) {
+                const benchmarkWeight = alloc.weight / 100;
+                totals['Equity'] += benchmarkWeight * (benchmark.assetAllocation.equity / 100);
+                totals['Fixed Income'] += benchmarkWeight * (benchmark.assetAllocation.fixedIncome / 100);
+                totals['Alternatives'] += benchmarkWeight * (benchmark.assetAllocation.alternatives / 100);
+            }
+        });
+
+        return Object.entries(totals)
+            .map(([name, value]) => ({ name, value: value * 100 }))
+            .filter(item => item.value > 0.01);
+    }, [benchmarkAllocations, benchmarks]);
+
     const handleGenerateReport = useCallback(async () => {
         if (totalAllocation !== 100) {
-            alert("Total allocation must be 100%.");
+            alert("Total portfolio allocation must be 100%.");
+            return;
+        }
+
+        if (totalBenchmarkAllocation !== 100) {
+            alert("Total benchmark allocation must be 100%.");
             return;
         }
 
@@ -213,10 +270,33 @@ useEffect(() => {
             };
         });
 
-        const benchmark = benchmarks.find(b => b.id === selectedBenchmarkId);
-        if (!benchmark) {
-            alert("Please select a benchmark.");
-            return;
+        // Use benchmark allocations if available, otherwise fall back to selectedBenchmarkId
+        let benchmarkReturns: MonthlyReturn[];
+        let benchmarkName: string;
+        
+        if (benchmarkAllocations.length > 0) {
+            const selectedBenchmarks = benchmarkAllocations.map(alloc => {
+                const benchmark = benchmarks.find(b => b.id === alloc.strategyId);
+                if (!benchmark) throw new Error("Benchmark not found");
+                return {
+                    ...benchmark,
+                    weight: alloc.weight / 100
+                };
+            });
+            benchmarkReturns = blendPortfolios(selectedBenchmarks);
+            // Create a combined name for blended benchmarks
+            benchmarkName = benchmarkAllocations.length === 1 
+                ? benchmarks.find(b => b.id === benchmarkAllocations[0].strategyId)?.name || 'Benchmark'
+                : 'Blended Benchmark';
+        } else {
+            // Fallback to single benchmark selection
+            const benchmark = benchmarks.find(b => b.id === selectedBenchmarkId);
+            if (!benchmark) {
+                alert("Please select a benchmark.");
+                return;
+            }
+            benchmarkReturns = benchmark.returns;
+            benchmarkName = benchmark.name;
         }
 
         const portfolioReturns = blendPortfolios(selectedStrategies);
@@ -224,7 +304,7 @@ useEffect(() => {
         const annualDistributionNum = parseFloat(annualDistribution) || 0;
         const clientAgeNum = parseFloat(clientAge) || 0;
         const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
-        const benchmarkMetrics = calculateMetrics(benchmark.returns, investmentAmountNum, annualDistributionNum, clientAgeNum);
+        const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
 
         const report: ReportData = {
             portfolio: {
@@ -233,7 +313,7 @@ useEffect(() => {
             },
             benchmark: {
                 ...benchmarkMetrics,
-                name: benchmark.name
+                name: benchmarkName
             }
         };
 
@@ -256,7 +336,7 @@ useEffect(() => {
             console.error('Error saving proposal:', error);
         }
     }, [
-        totalAllocation, portfolioAllocations, strategies, benchmarks, selectedBenchmarkId,
+        totalAllocation, totalBenchmarkAllocation, portfolioAllocations, benchmarkAllocations, strategies, benchmarks, selectedBenchmarkId,
         adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance, aiSummary
     ]);
 
@@ -512,15 +592,15 @@ useEffect(() => {
                                 {benchmarks.length > 0 ? (
                                     <BenchmarkSelector
                                         benchmarks={benchmarks}
-                                        selectedBenchmarkId={selectedBenchmarkId}
-                                        setSelectedBenchmarkId={setSelectedBenchmarkId}
+                                        allocations={benchmarkAllocations}
+                                        setAllocations={setBenchmarkAllocations}
                                     />
                                 ) : <p className="text-gray-500">No benchmarks available. Please add one in the Admin Panel.</p>}
                             </div>
 
                             <button
                                 onClick={handleGenerateReport}
-                                disabled={totalAllocation !== 100 || strategies.length === 0 || benchmarks.length === 0}
+                                disabled={totalAllocation !== 100 || totalBenchmarkAllocation !== 100 || strategies.length === 0 || benchmarks.length === 0}
                                 className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300 shadow-md text-lg"
                             >
                                 Generate Report
@@ -553,6 +633,10 @@ useEffect(() => {
                                       clientAge={clientAge}
                                       annualDistribution={annualDistribution}
                                       riskTolerance={riskTolerance}
+                                      strategyAllocationData={strategyAllocationData}
+                                      categoryAllocationData={categoryAllocationData}
+                                      benchmarkAllocationData={benchmarkAllocationData}
+                                      benchmarkCategoryAllocationData={benchmarkCategoryAllocationData}
                                     />
                                </div>
                             ) : (
