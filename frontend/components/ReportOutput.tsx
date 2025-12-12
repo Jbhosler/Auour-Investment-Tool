@@ -12,15 +12,17 @@ import ReportPage from './ReportPage'; // New import
 import GrowthChart from './GrowthChart';
 import DistributionAnalysis from './DistributionAnalysis';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { apiService } from '../services/apiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@^4.4.168/build/pdf.worker.min.mjs';
 
 interface ReportOutputProps {
     reportData: ReportData;
-    beforeOutputPages: string[];
-    pagesAfterOutput: string[];
+    selectedBeforePageIds: string[];
+    selectedAfterPageIds: string[];
     aiSummary: string;
     firmLogo: string | null;
+    secondaryLogo: string | null;
     adviserName: string;
     clientName: string;
     investmentAmount: string;
@@ -155,10 +157,11 @@ const ClientVariables: React.FC<{
 
 const ReportOutput: React.FC<ReportOutputProps> = ({ 
     reportData, 
-    beforeOutputPages, 
-    pagesAfterOutput, 
+    selectedBeforePageIds, 
+    selectedAfterPageIds, 
     aiSummary, 
     firmLogo,
+    secondaryLogo,
     adviserName,
     clientName,
     investmentAmount,
@@ -416,6 +419,34 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
             };
             
           
+            /**
+             * Safely extracts base64 data from page_data string.
+             * Handles both data URL format (data:application/pdf;base64,<data>) and pure base64 format.
+             */
+            const extractBase64Data = (pageData: string): string => {
+                if (!pageData || typeof pageData !== 'string') {
+                    throw new Error('pageData is empty, undefined, or not a string');
+                }
+                
+                // Trim whitespace
+                const trimmed = pageData.trim();
+                if (!trimmed) {
+                    throw new Error('pageData is empty after trimming');
+                }
+                
+                // Check if it's a data URL (contains comma)
+                if (trimmed.includes(',')) {
+                    const parts = trimmed.split(',');
+                    if (parts.length >= 2 && parts[1] && parts[1].trim()) {
+                        return parts[1].trim();
+                    }
+                    throw new Error('Invalid data URL format: missing base64 data after comma');
+                }
+                
+                // If no comma, assume it's already pure base64
+                return trimmed;
+            };
+
             const addPdfPagesToPdf = async (pdfDataUrls: string[]) => {
                 if (!pdfDataUrls || pdfDataUrls.length === 0) {
                     console.log('No PDF pages to add');
@@ -423,7 +454,8 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 }
                 for (const pdfData of pdfDataUrls) {
                     try {
-                        const loadingTask = pdfjsLib.getDocument({ data: atob(pdfData.split(',')[1]) });
+                        const base64Data = extractBase64Data(pdfData);
+                        const loadingTask = pdfjsLib.getDocument({ data: atob(base64Data) });
                         const sourcePdf = await loadingTask.promise;
                         for (let i = 1; i <= sourcePdf.numPages; i++) {
                             const page = await sourcePdf.getPage(i);
@@ -969,11 +1001,29 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
             // FIX: Replaced JSX.Element with React.ReactElement to fix "Cannot find namespace 'JSX'" error.
             ].filter((p): p is { title: string; component: React.ReactElement; } => p !== null);
 
+            // Fetch page data from library for selected pages
+            const fetchPageData = async (pageIds: string[]): Promise<string[]> => {
+                if (pageIds.length === 0) return [];
+                
+                try {
+                    const pages = await Promise.all(
+                        pageIds.map(id => apiService.getPageFromLibrary(id))
+                    );
+                    return pages.map(p => p.page_data);
+                } catch (error) {
+                    console.error('Error fetching pages from library:', error);
+                    return [];
+                }
+            };
+
+            const beforeOutputPages = await fetchPageData(selectedBeforePageIds);
+            const pagesAfterOutput = await fetchPageData(selectedAfterPageIds);
+
             const totalPages = 1 + beforeOutputPages.length + reportPageComponents.length + pagesAfterOutput.length;
             let pageCounter = 1;
 
             // 1. Title Page
-            await addComponentPageToPdf(<TitlePage {...reportData} firmLogo={firmLogo} adviserName={adviserName} clientName={clientName} investmentAmount={investmentAmount} clientAge={clientAge} annualDistribution={annualDistribution} riskTolerance={riskTolerance} portfolioName={reportData.portfolio.name} />);
+            await addComponentPageToPdf(<TitlePage {...reportData} firmLogo={firmLogo} secondaryLogo={secondaryLogo} adviserName={adviserName} clientName={clientName} investmentAmount={investmentAmount} clientAge={clientAge} annualDistribution={annualDistribution} riskTolerance={riskTolerance} portfolioName={reportData.portfolio.name} />);
             pageCounter++;
 
             // 2. "Before" PDF pages

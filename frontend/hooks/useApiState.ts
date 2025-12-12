@@ -56,8 +56,11 @@ export function useApiState(dataType, defaultValue) {
 export function useSettingsState() {
   const [settings, setSettings] = useState({
     logo_data: null,
+    secondary_logo_data: null,
     before_output_pages: [],
-    after_output_pages: []
+    after_output_pages: [],
+    selected_before_page_ids: [],
+    selected_after_page_ids: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +68,14 @@ export function useSettingsState() {
     async function loadSettings() {
       try {
         const data = await apiService.getSettings();
-        setSettings(data);
+        setSettings({
+          logo_data: data.logo_data || null,
+          secondary_logo_data: data.secondary_logo_data || null,
+          before_output_pages: data.before_output_pages || [],
+          after_output_pages: data.after_output_pages || [],
+          selected_before_page_ids: data.selected_before_page_ids || [],
+          selected_after_page_ids: data.selected_after_page_ids || []
+        });
       } catch (err) {
         console.error('Error loading settings:', err);
       } finally {
@@ -78,7 +88,14 @@ export function useSettingsState() {
   const updateSettings = async (newSettings) => {
     try {
       const updated = await apiService.updateSettings(newSettings);
-      setSettings(updated);
+      setSettings({
+        logo_data: updated.logo_data || null,
+        secondary_logo_data: updated.secondary_logo_data || null,
+        before_output_pages: updated.before_output_pages || [],
+        after_output_pages: updated.after_output_pages || [],
+        selected_before_page_ids: updated.selected_before_page_ids || [],
+        selected_after_page_ids: updated.selected_after_page_ids || []
+      });
       return updated;
     } catch (err) {
       console.error('Error updating settings:', err);

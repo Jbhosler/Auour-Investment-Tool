@@ -462,42 +462,26 @@ useEffect(() => {
         }
     };
 
-    const handleAddBeforeOutputPage = async (pageData: string) => {
-        const newPages = [...(settings.before_output_pages || []), pageData];
-        await updateSettings({ ...settings, before_output_pages: newPages });
+    const handleUpdateSelectedBeforePages = async (pageIds: string[]) => {
+        await updateSettings({ 
+            ...settings, 
+            selected_before_page_ids: pageIds 
+        });
     };
 
-    const handleDeleteBeforeOutputPage = async (index: number) => {
-        const newPages = settings.before_output_pages?.filter((_, i) => i !== index) || [];
-        await updateSettings({ ...settings, before_output_pages: newPages });
-    };
-
-    const handleReorderBeforeOutputPages = async (startIndex: number, endIndex: number) => {
-        const result = Array.from(settings.before_output_pages || []);
-        const [removed] = result.splice(startIndex, 1);
-        result.splice(endIndex, 0, removed);
-        await updateSettings({ ...settings, before_output_pages: result });
-    };
-
-    const handleAddPageAfterOutput = async (pageData: string) => {
-        const newPages = [...(settings.after_output_pages || []), pageData];
-        await updateSettings({ ...settings, after_output_pages: newPages });
-    };
-
-    const handleDeletePageAfterOutput = async (index: number) => {
-        const newPages = settings.after_output_pages?.filter((_, i) => i !== index) || [];
-        await updateSettings({ ...settings, after_output_pages: newPages });
-    };
-
-    const handleReorderPagesAfterOutput = async (startIndex: number, endIndex: number) => {
-        const result = Array.from(settings.after_output_pages || []);
-        const [removed] = result.splice(startIndex, 1);
-        result.splice(endIndex, 0, removed);
-        await updateSettings({ ...settings, after_output_pages: result });
+    const handleUpdateSelectedAfterPages = async (pageIds: string[]) => {
+        await updateSettings({ 
+            ...settings, 
+            selected_after_page_ids: pageIds 
+        });
     };
 
     const handleSetFirmLogo = async (logoData: string | null) => {
         await updateSettings({ ...settings, logo_data: logoData });
+    };
+
+    const handleSetSecondaryLogo = async (logoData: string | null) => {
+        await updateSettings({ ...settings, secondary_logo_data: logoData });
     };
 
     if (strategiesState.loading || benchmarksState.loading || settingsState.loading) {
@@ -540,16 +524,14 @@ useEffect(() => {
                         onAddBenchmark={handleAddBenchmark}
                         onUpdateBenchmark={handleUpdateBenchmark}
                         onDeleteBenchmark={handleDeleteBenchmark}
-                        beforeOutputPages={settings.before_output_pages || []}
-                        pagesAfterOutput={settings.after_output_pages || []}
-                        onAddBeforeOutputPage={handleAddBeforeOutputPage}
-                        onDeleteBeforeOutputPage={handleDeleteBeforeOutputPage}
-                        onReorderBeforeOutputPage={handleReorderBeforeOutputPages}
-                        onAddPageAfterOutput={handleAddPageAfterOutput}
-                        onDeletePageAfterOutput={handleDeletePageAfterOutput}
-                        onReorderPageAfterOutput={handleReorderPagesAfterOutput}
+                        selectedBeforePageIds={settings.selected_before_page_ids || []}
+                        selectedAfterPageIds={settings.selected_after_page_ids || []}
+                        onUpdateSelectedBeforePages={handleUpdateSelectedBeforePages}
+                        onUpdateSelectedAfterPages={handleUpdateSelectedAfterPages}
                         firmLogo={settings.logo_data}
+                        secondaryLogo={settings.secondary_logo_data}
                         onSetFirmLogo={handleSetFirmLogo}
+                        onSetSecondaryLogo={handleSetSecondaryLogo}
                     />
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -623,10 +605,11 @@ useEffect(() => {
                                     />
                                     <ReportOutput
                                       reportData={reportData}
-                                      beforeOutputPages={settings.before_output_pages || []}
-                                      pagesAfterOutput={settings.after_output_pages || []}
+                                      selectedBeforePageIds={settings.selected_before_page_ids || []}
+                                      selectedAfterPageIds={settings.selected_after_page_ids || []}
                                       aiSummary={aiSummary}
                                       firmLogo={settings.logo_data}
+                                      secondaryLogo={settings.secondary_logo_data}
                                       adviserName={adviserName}
                                       clientName={clientName}
                                       investmentAmount={investmentAmount}

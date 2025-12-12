@@ -2,6 +2,7 @@ import React from 'react';
 
 interface TitlePageProps {
     firmLogo: string | null;
+    secondaryLogo: string | null;
     portfolioName: string;
     adviserName: string;
     clientName: string;
@@ -11,7 +12,7 @@ interface TitlePageProps {
     riskTolerance: string;
 }
 
-const TitlePage: React.FC<TitlePageProps> = ({ firmLogo, portfolioName, adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance }) => {
+const TitlePage: React.FC<TitlePageProps> = ({ firmLogo, secondaryLogo, portfolioName, adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance }) => {
     const today = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -37,15 +38,24 @@ const TitlePage: React.FC<TitlePageProps> = ({ firmLogo, portfolioName, adviserN
             {/* Main Content Area - lighter background, better spacing for A4, ensure no clipping */}
             <div className="flex-1 flex flex-col justify-between px-12 py-10 bg-white" style={{ minHeight: '297mm' }}>
                 {/* Header Section - reduced height to prevent clipping */}
-                <header className="w-full" style={{ minHeight: '60px', maxHeight: '80px' }}>
-                    {firmLogo && (
-                        <div className="w-48 h-16 mb-4">
-                            <img src={firmLogo} alt="Firm Logo" className="max-w-full max-h-full object-contain" />
-                        </div>
-                    )}
-                    {!firmLogo && (
-                        <div className="w-48 h-16"></div>
-                    )}
+                <header className="w-full flex justify-between items-start mb-4" style={{ minHeight: '60px', maxHeight: '80px' }}>
+                    {/* Primary Logo - Left, Larger */}
+                    <div className="flex-shrink-0" style={{ width: '192px', height: '64px' }}>
+                        {firmLogo ? (
+                            <img src={firmLogo} alt="Primary Logo" className="max-w-full max-h-full object-contain" style={{ height: '64px' }} />
+                        ) : (
+                            <div style={{ height: '64px' }}></div>
+                        )}
+                    </div>
+                    
+                    {/* Secondary Logo - Right, Smaller */}
+                    <div className="flex-shrink-0 flex justify-end" style={{ width: '144px', height: '48px' }}>
+                        {secondaryLogo ? (
+                            <img src={secondaryLogo} alt="Secondary Logo" className="max-w-full max-h-full object-contain" style={{ height: '48px' }} />
+                        ) : (
+                            <div style={{ height: '48px' }}></div>
+                        )}
+                    </div>
                 </header>
 
                 {/* Body Section - ensure no clipping with max-width and wrapping, centered vertically */}

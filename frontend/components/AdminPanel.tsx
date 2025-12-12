@@ -6,7 +6,6 @@ import AddEditModal from './AddEditModal';
 import { PlusCircleIcon } from './icons/Icons';
 import PdfPageManager from './PdfPageManager';
 import FirmLogoManager from './FirmLogoManager';
-import DefaultDataExporter from './DefaultDataExporter';
 
 interface AdminPanelProps {
     strategies: Strategy[];
@@ -17,16 +16,14 @@ interface AdminPanelProps {
     onAddBenchmark: (name: string, returns: MonthlyReturn[]) => void;
     onUpdateBenchmark: (id: string, name: string) => void;
     onDeleteBenchmark: (id: string) => void;
-    beforeOutputPages: string[];
-    pagesAfterOutput: string[];
-    onAddBeforeOutputPage: (pageData: string) => void;
-    onDeleteBeforeOutputPage: (index: number) => void;
-    onReorderBeforeOutputPage: (startIndex: number, endIndex: number) => void;
-    onAddPageAfterOutput: (pageData: string) => void;
-    onDeletePageAfterOutput: (index: number) => void;
-    onReorderPageAfterOutput: (startIndex: number, endIndex: number) => void;
+    selectedBeforePageIds: string[];
+    selectedAfterPageIds: string[];
+    onUpdateSelectedBeforePages: (pageIds: string[]) => void;
+    onUpdateSelectedAfterPages: (pageIds: string[]) => void;
     firmLogo: string | null;
+    secondaryLogo: string | null;
     onSetFirmLogo: (logo: string | null) => void;
+    onSetSecondaryLogo: (logo: string | null) => void;
 }
 
 type ModalState = {
@@ -77,44 +74,25 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                 />
             )}
             
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Set as Default Configuration</h2>
-                <p className="text-sm text-gray-600 mb-4">
-                    Make the current set of strategies and benchmarks the new default for the entire application.
-                </p>
-                <DefaultDataExporter strategies={props.strategies} benchmarks={props.benchmarks} />
-                <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                    <h4 className="font-semibold text-gray-700">How to use:</h4>
-                    <ol className="list-decimal list-inside text-sm text-gray-600 mt-2 space-y-1">
-                        <li>Customize strategies and benchmarks using the tools below.</li>
-                        <li>Click "Generate New Default Data File" and copy the generated code.</li>
-                        <li>Open the file <code className="bg-gray-200 text-red-600 px-1 rounded">data/mockData.ts</code> in your project.</li>
-                        <li>Replace the entire content of that file with the code you copied.</li>
-                        <li>Your new configuration is now the permanent default for the application.</li>
-                    </ol>
-                </div>
-            </div>
-
-
             <FirmLogoManager
                 logo={props.firmLogo}
+                secondaryLogo={props.secondaryLogo}
                 onSetLogo={props.onSetFirmLogo}
+                onSetSecondaryLogo={props.onSetSecondaryLogo}
             />
 
             <PdfPageManager
                 title="Manage Before Output Pages"
-                pages={props.beforeOutputPages}
-                onAddPage={props.onAddBeforeOutputPage}
-                onDeletePage={props.onDeleteBeforeOutputPage}
-                onReorderPage={props.onReorderBeforeOutputPage}
+                positionType="before"
+                selectedPageIds={props.selectedBeforePageIds}
+                onUpdateSelectedPages={props.onUpdateSelectedBeforePages}
             />
 
             <PdfPageManager
                 title="Manage Pages After Output"
-                pages={props.pagesAfterOutput}
-                onAddPage={props.onAddPageAfterOutput}
-                onDeletePage={props.onDeletePageAfterOutput}
-                onReorderPage={props.onReorderPageAfterOutput}
+                positionType="after"
+                selectedPageIds={props.selectedAfterPageIds}
+                onUpdateSelectedPages={props.onUpdateSelectedAfterPages}
             />
             
             {/* Strategies Section */}
