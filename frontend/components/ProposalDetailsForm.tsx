@@ -13,6 +13,8 @@ interface ProposalDetailsFormProps {
     setAnnualDistribution: (amount: string) => void;
     riskTolerance: string;
     setRiskTolerance: (tolerance: string) => void;
+    adviserFee: string;
+    setAdviserFee: (fee: string) => void;
 }
 
 const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
@@ -27,7 +29,9 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
     annualDistribution,
     setAnnualDistribution,
     riskTolerance,
-    setRiskTolerance
+    setRiskTolerance,
+    adviserFee,
+    setAdviserFee
 }) => {
 
     const formatForDisplay = (value: string) => {
@@ -149,6 +153,40 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
                             <span className="text-gray-500 sm:text-sm">USD</span>
                         </div>
                     </div>
+                </div>
+                <div>
+                    <label htmlFor="adviser-fee" className="block text-sm font-medium text-gray-700">
+                        Adviser Annual Fee (%)
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                        <input
+                            type="text"
+                            id="adviser-fee"
+                            value={adviserFee}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                // Allow decimal numbers with up to 2 decimal places
+                                const sanitizedValue = value.replace(/[^0-9.]/g, '');
+                                // Ensure only one decimal point
+                                const parts = sanitizedValue.split('.');
+                                if (parts.length > 2) {
+                                    setAdviserFee(parts[0] + '.' + parts.slice(1).join(''));
+                                } else if (parts[1] && parts[1].length > 2) {
+                                    setAdviserFee(parts[0] + '.' + parts[1].substring(0, 2));
+                                } else {
+                                    setAdviserFee(sanitizedValue);
+                                }
+                            }}
+                            className="block w-full border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            placeholder="1.00"
+                        />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <span className="text-gray-500 sm:text-sm">%</span>
+                        </div>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                        Annual fee deducted monthly on a pro-rata basis (e.g., 1% = 0.083% per month)
+                    </p>
                 </div>
             </div>
         </div>

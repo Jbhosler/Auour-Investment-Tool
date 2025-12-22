@@ -4,7 +4,7 @@ import { Strategy, Benchmark, MonthlyReturn, AssetAllocation } from '../types';
 import AdminTable from './AdminTable';
 import AddEditModal from './AddEditModal';
 import { PlusCircleIcon } from './icons/Icons';
-import PdfPageManager from './PdfPageManager';
+import UnifiedPageManager from './UnifiedPageManager';
 import FirmLogoManager from './FirmLogoManager';
 
 interface AdminPanelProps {
@@ -81,18 +81,11 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
                 onSetSecondaryLogo={props.onSetSecondaryLogo}
             />
 
-            <PdfPageManager
-                title="Manage Before Output Pages"
-                positionType="before"
-                selectedPageIds={props.selectedBeforePageIds}
-                onUpdateSelectedPages={props.onUpdateSelectedBeforePages}
-            />
-
-            <PdfPageManager
-                title="Manage Pages After Output"
-                positionType="after"
-                selectedPageIds={props.selectedAfterPageIds}
-                onUpdateSelectedPages={props.onUpdateSelectedAfterPages}
+            <UnifiedPageManager
+                selectedBeforePageIds={props.selectedBeforePageIds}
+                selectedAfterPageIds={props.selectedAfterPageIds}
+                onUpdateSelectedBeforePages={props.onUpdateSelectedBeforePages}
+                onUpdateSelectedAfterPages={props.onUpdateSelectedAfterPages}
             />
             
             {/* Strategies Section */}

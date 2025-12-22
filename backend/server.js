@@ -469,10 +469,10 @@ app.put('/api/settings', async (req, res) => {
       : [
           logo_data,
           secondary_logo_data,
-          JSON.stringify(before_output_pages) || [], 
-          JSON.stringify(after_output_pages) || [],
-          JSON.stringify(selected_before_page_ids) || [],
-          JSON.stringify(selected_after_page_ids) || []
+          JSON.stringify(before_output_pages || []), 
+          JSON.stringify(after_output_pages || []),
+          JSON.stringify(selected_before_page_ids || []),
+          JSON.stringify(selected_after_page_ids || [])
         ];
     
     await query(sql, params);

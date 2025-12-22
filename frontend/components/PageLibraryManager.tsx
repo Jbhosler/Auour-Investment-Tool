@@ -120,12 +120,13 @@ const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, o
 
     useEffect(() => {
         loadPages();
-    }, [positionType]);
+    }, []);
 
     const loadPages = async () => {
         try {
             setLoading(true);
-            const data = await apiService.getPageLibrary(positionType);
+            // Load all pages regardless of position_type for unified library
+            const data = await apiService.getPageLibrary();
             setPages(data);
         } catch (error) {
             console.error('Error loading page library:', error);
@@ -151,10 +152,11 @@ const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, o
 
         try {
             const base64 = await fileToBase64(newPageFile);
+            // Use 'before' as default position_type (it's not used in unified library but required by API)
             await apiService.createPageInLibrary({
                 name: newPageName.trim(),
                 page_data: base64,
-                position_type: positionType
+                position_type: 'before'
             });
             
             setNewPageName('');
@@ -211,7 +213,7 @@ const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, o
         }
     };
 
-    const title = positionType === 'before' ? 'Before Output Pages Library' : 'After Output Pages Library';
+    const title = 'Page Library';
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">

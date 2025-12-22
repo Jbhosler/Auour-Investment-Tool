@@ -242,9 +242,6 @@ if (USE_SQLITE) {
       } catch (settingsError) {
         console.error('Error initializing firm settings (non-critical):', settingsError.message);
       }
-
-      initialized = true;
-      console.log('✅ PostgreSQL tables initialized successfully');
       
       // Verify page_library table exists
       const verifyResult = await db.query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'page_library')");
@@ -253,6 +250,9 @@ if (USE_SQLITE) {
       } else {
         console.error('❌ ERROR: page_library table verification failed!');
       }
+
+      initialized = true;
+      console.log('✅ PostgreSQL tables initialized successfully');
     } catch (error) {
       console.error('❌ CRITICAL: Error initializing PostgreSQL tables:', error);
       console.error('Error message:', error.message);

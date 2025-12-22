@@ -205,7 +205,31 @@ const calculateIRRForPeriod = (
 };
 
 
-export const blendPortfolios = (weightedStrategies: (Strategy & { weight: number })[]): MonthlyReturn[] => {
+/**
+ * Adjusts monthly returns by deducting an annual adviser fee on a pro-rata basis.
+ * If annual fee is 1%, each monthly return is reduced by (1/12)% = 0.0833%
+ * @param returns - Array of monthly returns to adjust
+ * @param annualFeePercent - Annual fee as a percentage (e.g., 1 for 1%)
+ * @returns Adjusted monthly returns
+ */
+export const adjustReturnsByFee = (returns: MonthlyReturn[], annualFeePercent: number): MonthlyReturn[] => {
+    if (annualFeePercent <= 0 || !annualFeePercent) {
+        return returns;
+    }
+    
+    // Convert annual fee to monthly fee (divide by 12)
+    const monthlyFeeDecimal = annualFeePercent / 100 / 12;
+    
+    return returns.map(r => ({
+        date: r.date,
+        value: r.value - monthlyFeeDecimal
+    }));
+};
+
+export const blendPortfolios = (
+    weightedStrategies: (Strategy & { weight: number })[], 
+    annualFeePercent?: number
+): MonthlyReturn[] => {
     if (weightedStrategies.length === 0) return [];
     
     const firstStrategy = weightedStrategies[0];
@@ -222,6 +246,11 @@ export const blendPortfolios = (weightedStrategies: (Strategy & { weight: number
         }
         br.value = totalReturnValue;
     });
+
+    // Apply fee adjustment if provided
+    if (annualFeePercent && annualFeePercent > 0) {
+        return adjustReturnsByFee(blendedReturns, annualFeePercent);
+    }
 
     return blendedReturns;
 };

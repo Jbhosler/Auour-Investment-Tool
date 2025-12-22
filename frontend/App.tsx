@@ -45,6 +45,7 @@ const App: React.FC = () => {
     const [clientAge, setClientAge] = useState<string>('');
     const [annualDistribution, setAnnualDistribution] = useState<string>('');
     const [riskTolerance, setRiskTolerance] = useState<string>('');
+    const [adviserFee, setAdviserFee] = useState<string>('');
     
     // Initialize allocations when strategies load
   // Initialize allocations when strategies load
@@ -150,7 +151,10 @@ useEffect(() => {
    
 
 
-        const portfolioReturns = blendPortfolios(selectedStrategies);
+        // Get adviser fee for calculations
+        const adviserFeeNum = parseFloat(adviserFee) || 0;
+        
+        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum);
         const portfolioMetrics = calculateMetrics(portfolioReturns);
         const portfolioVolatility = portfolioMetrics.volatility;
 
@@ -299,7 +303,11 @@ useEffect(() => {
             benchmarkName = benchmark.name;
         }
 
-        const portfolioReturns = blendPortfolios(selectedStrategies);
+        // Parse adviser fee (annual percentage)
+        const adviserFeeNum = parseFloat(adviserFee) || 0;
+        
+        // Apply adviser fee to portfolio returns (but not benchmark - benchmarks are already net of their fees)
+        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum);
         const investmentAmountNum = parseFloat(investmentAmount) || 0;
         const annualDistributionNum = parseFloat(annualDistribution) || 0;
         const clientAgeNum = parseFloat(clientAge) || 0;
@@ -337,7 +345,7 @@ useEffect(() => {
         }
     }, [
         totalAllocation, totalBenchmarkAllocation, portfolioAllocations, benchmarkAllocations, strategies, benchmarks, selectedBenchmarkId,
-        adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance, aiSummary
+        adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance, adviserFee, aiSummary
     ]);
 
     // Admin handlers with API
@@ -549,6 +557,8 @@ useEffect(() => {
                                 setAnnualDistribution={setAnnualDistribution}
                                 riskTolerance={riskTolerance}
                                 setRiskTolerance={setRiskTolerance}
+                                adviserFee={adviserFee}
+                                setAdviserFee={setAdviserFee}
                             />
                             <div className="bg-white p-6 rounded-lg shadow-lg">
                                 <h2 className="text-xl font-semibold mb-4 border-b pb-2">1. Configure Portfolio</h2>
