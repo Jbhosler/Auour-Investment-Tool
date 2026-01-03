@@ -462,14 +462,39 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
         const annualizedReturnLabel = `Annualized ${returnLabel}`;
 
         const prompt = `
-    You are a financial analyst. Write a concise executive summary comparing a proposed investment portfolio against its benchmark. 
-    
-    IMPORTANT: 
-    - Do NOT include greetings, salutations, or opening sentences like "Dear Client" or "This analysis shows..."
-    - Start directly with the analysis content
-    - Keep it brief - aim for 2-3 short paragraphs maximum (approximately 150-200 words total)
-    - Focus on key highlights and comparisons, not detailed analysis
-    
+    You are an experienced fiduciary financial adviser at Auour Investments writing an executive summary for an investment proposal.
+
+    Write a concise executive summary comparing a proposed investment portfolio to its stated benchmark using the provided historical results and risk metrics.
+
+    REQUIREMENTS:
+    - Do NOT include greetings, salutations, or meta commentary
+    - Begin directly with substantive analysis
+    - Limit to 2 to 3 short paragraphs (150 to 200 words total)
+    - Write in clear, client-appropriate language (intelligent but not technical)
+    - Do not reference raw tables or specific data inputs explicitly
+
+    FOCUS AREAS (IN ORDER OF PRIORITY):
+    1. Emphasize how the proposed portfolio improves the *quality* of returns relative to the benchmark, not just headline performance.
+    2. Highlight Auour's core strengths:
+       - Mitigation of large drawdowns
+       - Improved downside resilience across market regimes
+       - Competitive long-term return potential with lower volatility
+    3. When relevant, explain how reduced drawdowns and volatility improve investor outcomes through:
+       - Better compounding
+       - Higher likelihood of staying invested during market stress
+    4. If Monte Carlo results are included, frame them in terms of:
+       - Improved range of outcomes
+       - Reduced probability of adverse scenarios
+    5. If other non-Auour strategies are present, integrate them naturally, while clearly attributing portfolio structure, risk management philosophy, and outcome orientation to Auour Investments.
+
+    TONE & POSITIONING:
+    - Fiduciary, disciplined, and risk-aware
+    - Outcome-focused rather than product-focused
+    - Confident but not promotional
+    - Emphasize process and consistency over short-term market timing
+
+    Do not overstate certainty. Do not make predictions. Focus on historical evidence and portfolio construction logic.
+
     ${clientContext}
 
     **Proposed Portfolio: ${reportData.portfolio.name}**
@@ -496,12 +521,7 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
         2. ${reportData.benchmark.drawdowns.length > 1 ? formatDrawdown(reportData.benchmark.drawdowns[1]) : 'N/A'}
         3. ${reportData.benchmark.drawdowns.length > 2 ? formatDrawdown(reportData.benchmark.drawdowns[2]) : 'N/A'}
 
-    Generate a brief executive summary (2-3 short paragraphs, ~150-200 words) covering:
-    1. Key performance comparisons (returns vs benchmark)
-    2. Risk characteristics (volatility and drawdowns)
-    3. Brief conclusion on portfolio positioning
-    
-        Start directly with the content - no greetings or introductory sentences.
+    Generate the executive summary following the requirements and focus areas above. Start directly with the analysis content - no greetings or introductory sentences.
         `;
 
         try {
