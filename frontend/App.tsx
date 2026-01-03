@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation } from './types';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation, Account } from './types';
 import { blendPortfolios, calculateMetrics } from './services/performanceCalculator';
 import { apiService } from './services/apiService';
 import { useApiState, useSettingsState } from './hooks/useApiState';
@@ -11,79 +11,71 @@ import { AiSummary } from './components/AiSummary';
 import AdminPanel from './components/AdminPanel';
 import AllocationCharts from './components/AllocationCharts';
 import ProposalDetailsForm from './components/ProposalDetailsForm';
+import AccountSelector from './components/AccountSelector';
+import HouseholdSummary from './components/HouseholdSummary';
 
 const App: React.FC = () => {
-    // PHASE 1 DIAGNOSTIC: App component render logging
-    console.error('🏠🏠🏠 App COMPONENT RENDERED 🏠🏠🏠');
-    try {
-        localStorage.setItem('app_component_rendered', JSON.stringify({
-            timestamp: new Date().toISOString(),
-            message: 'App component rendered'
-        }));
-        console.error('✅ Stored App render test to localStorage');
-    } catch (e) {
-        console.error('❌ Failed to store App render test:', e);
-    }
-    
     const [isAdminMode, setIsAdminMode] = useState(false);
+    const [isHouseholdMode, setIsHouseholdMode] = useState(false);
+    const [householdView, setHouseholdView] = useState<'account' | 'summary'>('account');
     
     // Use API state instead of localStorage
     const [strategies, setStrategies, strategiesState] = useApiState('strategies', []);
     const [benchmarks, setBenchmarks, benchmarksState] = useApiState('benchmarks', []);
     const [settings, updateSettings, settingsState] = useSettingsState();
 
-    const [portfolioAllocations, setPortfolioAllocations] = useState<Allocation[]>([]);
-    const [benchmarkAllocations, setBenchmarkAllocations] = useState<Allocation[]>([]);
-    const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('b1'); // Keep for backward compatibility, but will use benchmarkAllocations if available
-    const [reportData, setReportData] = useState<ReportData | null>(null);
-    const [aiSummary, setAiSummary] = useState<string>('');
+    // Household and account management
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
-    // Proposal details
+    // Shared household-level data
     const [adviserName, setAdviserName] = useState<string>('');
     const [clientName, setClientName] = useState<string>('');
-    const [investmentAmount, setInvestmentAmount] = useState<string>('');
-    const [clientAge, setClientAge] = useState<string>('');
-    const [annualDistribution, setAnnualDistribution] = useState<string>('');
-    const [riskTolerance, setRiskTolerance] = useState<string>('');
-    const [adviserFee, setAdviserFee] = useState<string>('');
+
+    // Helper to get current account
+    const currentAccount = useMemo(() => {
+        if (!selectedAccountId) return null;
+        return accounts.find(acc => acc.id === selectedAccountId) || null;
+    }, [accounts, selectedAccountId]);
+
+    // Track if we've initialized accounts to prevent loops
+    const accountsInitialized = useRef(false);
     
-    // Initialize allocations when strategies load
-  // Initialize allocations when strategies load
-useEffect(() => {
-    if (strategies.length > 0 && portfolioAllocations.length === 0) {
-        if (strategies.length >= 2) {
-            setPortfolioAllocations([
-                { strategyId: strategies[0].id, weight: 60 },
-                { strategyId: strategies[1].id, weight: 40 }
-            ]);
-        } else {
-            // Handle the single strategy case by allocating 100% to it
-            setPortfolioAllocations([
-                { strategyId: strategies[0].id, weight: 100 }
-            ]);
-        }
-    }
-}, [strategies, portfolioAllocations.length]); // Added .length to dependency for safety
-
-    // Initialize benchmark allocations when benchmarks load
+    // Initialize with a default account if none exist
     useEffect(() => {
-        if (benchmarks.length > 0 && benchmarkAllocations.length === 0) {
-            // Default to 100% to first benchmark
-            setBenchmarkAllocations([
-                { strategyId: benchmarks[0].id, weight: 100 }
-            ]);
+        if (!accountsInitialized.current && accounts.length === 0) {
+            accountsInitialized.current = true;
+            const defaultAccount: Account = {
+                id: `account-${Date.now()}`,
+                accountName: 'Account 1',
+                portfolioAllocations: [],
+                benchmarkAllocations: [],
+                selectedBenchmarkId: benchmarks.length > 0 ? benchmarks[0].id : '',
+                reportData: null,
+                aiSummary: '',
+                investmentAmount: '',
+                clientAge: '',
+                annualDistribution: '',
+                riskTolerance: '',
+                adviserFee: ''
+            };
+            setAccounts([defaultAccount]);
+            setSelectedAccountId(defaultAccount.id);
+        } else if (!selectedAccountId && accounts.length > 0) {
+            setSelectedAccountId(accounts[0].id);
         }
-    }, [benchmarks, benchmarkAllocations.length]);
+    }, [accounts.length, selectedAccountId, benchmarks.length]);
 
-    const totalAllocation = useMemo(() => 
-        portfolioAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0), 
-        [portfolioAllocations]
-    );
+    // Computed values for current account
+    const totalAllocation = useMemo(() => {
+        if (!currentAccount) return 0;
+        return currentAccount.portfolioAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0);
+    }, [currentAccount]);
 
-    const totalBenchmarkAllocation = useMemo(() => 
-        benchmarkAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0), 
-        [benchmarkAllocations]
-    );
+    const totalBenchmarkAllocation = useMemo(() => {
+        if (!currentAccount) return 0;
+        return currentAccount.benchmarkAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0);
+    }, [currentAccount]);
 
     const benchmarkMetricsMap = useMemo(() => {
         const map = new Map<string, PerformanceMetrics>();
@@ -93,21 +85,77 @@ useEffect(() => {
         return map;
     }, [benchmarks]);
     
-    // Auto-select best-fit benchmark
+    // Helper function to update an account
+    const updateAccount = useCallback((accountId: string, updates: Partial<Account>) => {
+        setAccounts(prev => prev.map(acc => acc.id === accountId ? { ...acc, ...updates } : acc));
+    }, []);
+
+    // Track last processed state to prevent infinite loops
+    const lastProcessedState = useRef<{
+        accountId: string | null;
+        portfolioAllocations: string;
+        totalAllocation: number;
+        strategiesLength: number;
+        benchmarksLength: number;
+    }>({
+        accountId: null,
+        portfolioAllocations: '',
+        totalAllocation: 0,
+        strategiesLength: 0,
+        benchmarksLength: 0
+    });
+
+    // Auto-select best-fit benchmark for current account
     useEffect(() => {
-        if (totalAllocation !== 100 || portfolioAllocations.length === 0) {
-            setReportData(null);
+        if (!currentAccount) {
+            if (lastProcessedState.current.accountId !== null) {
+                lastProcessedState.current = {
+                    accountId: null,
+                    portfolioAllocations: '',
+                    totalAllocation: 0,
+                    strategiesLength: strategies.length,
+                    benchmarksLength: benchmarks.length
+                };
+            }
+            return;
+        }
+
+        const portfolioAllocationsKey = JSON.stringify(currentAccount.portfolioAllocations);
+        const stateKey = {
+            accountId: currentAccount.id,
+            portfolioAllocations: portfolioAllocationsKey,
+            totalAllocation,
+            strategiesLength: strategies.length,
+            benchmarksLength: benchmarks.length
+        };
+
+        // Skip if we've already processed this exact state
+        if (
+            lastProcessedState.current.accountId === stateKey.accountId &&
+            lastProcessedState.current.portfolioAllocations === stateKey.portfolioAllocations &&
+            lastProcessedState.current.totalAllocation === stateKey.totalAllocation &&
+            lastProcessedState.current.strategiesLength === stateKey.strategiesLength &&
+            lastProcessedState.current.benchmarksLength === stateKey.benchmarksLength
+        ) {
+            return;
+        }
+
+        if (totalAllocation !== 100 || currentAccount.portfolioAllocations.length === 0) {
+            if (currentAccount.reportData !== null) {
+                updateAccount(currentAccount.id, { reportData: null });
+            }
+            lastProcessedState.current = stateKey;
             return;
         }
 
         // Defensively check for missing strategies and filter them out
-        const validAllocations = portfolioAllocations.filter(alloc => 
+        const validAllocations = currentAccount.portfolioAllocations.filter(alloc => 
             strategies.find(s => s.id === alloc.strategyId)
         );
 
         // If there are invalid allocations, clean them up silently
-        if (validAllocations.length !== portfolioAllocations.length) {
-            const invalidIds = portfolioAllocations
+        if (validAllocations.length !== currentAccount.portfolioAllocations.length) {
+            const invalidIds = currentAccount.portfolioAllocations
                 .filter(alloc => !strategies.find(s => s.id === alloc.strategyId))
                 .map(alloc => alloc.strategyId);
             console.warn('Removed invalid strategy allocations:', invalidIds);
@@ -126,39 +174,60 @@ useEffect(() => {
                     if (normalizedTotal !== 100 && normalizedAllocations.length > 0) {
                         normalizedAllocations[normalizedAllocations.length - 1].weight += (100 - normalizedTotal);
                     }
-                    setPortfolioAllocations(normalizedAllocations);
-                    return; // Exit early, will re-run with cleaned allocations
+                    updateAccount(currentAccount.id, { portfolioAllocations: normalizedAllocations });
+                    lastProcessedState.current = {
+                        accountId: currentAccount.id,
+                        portfolioAllocations: JSON.stringify(normalizedAllocations),
+                        totalAllocation: 100,
+                        strategiesLength: strategies.length,
+                        benchmarksLength: benchmarks.length
+                    };
+                    return;
                 } else {
-                    setPortfolioAllocations(validAllocations);
-                    return; // Exit early, will re-run with cleaned allocations
+                    updateAccount(currentAccount.id, { portfolioAllocations: validAllocations });
+                    lastProcessedState.current = {
+                        accountId: currentAccount.id,
+                        portfolioAllocations: JSON.stringify(validAllocations),
+                        totalAllocation,
+                        strategiesLength: strategies.length,
+                        benchmarksLength: benchmarks.length
+                    };
+                    return;
                 }
             } else {
-                setPortfolioAllocations([]);
-                return; // No valid allocations left
+                updateAccount(currentAccount.id, { portfolioAllocations: [] });
+                lastProcessedState.current = {
+                    accountId: currentAccount.id,
+                    portfolioAllocations: '[]',
+                    totalAllocation: 0,
+                    strategiesLength: strategies.length,
+                    benchmarksLength: benchmarks.length
+                };
+                return;
             }
         }
 
         // Now that we know they all exist, we can safely create the list
-        const selectedStrategies = portfolioAllocations.map(alloc => {
+        const selectedStrategies = currentAccount.portfolioAllocations.map(alloc => {
             const strategy = strategies.find(s => s.id === alloc.strategyId);
-            if (!strategy) return null; // Should not happen after filtering, but defensive
+            if (!strategy) return null;
             return {
                 ...strategy,
                 weight: alloc.weight / 100
             };
-        }).filter((s): s is NonNullable<typeof s> => s !== null); // Filter out any nulls
-           
-   
-
+        }).filter((s): s is NonNullable<typeof s> => s !== null);
 
         // Get adviser fee for calculations
-        const adviserFeeNum = parseFloat(adviserFee) || 0;
+        const adviserFeeNum = parseFloat(currentAccount.adviserFee) || 0;
         
         const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum);
         const portfolioMetrics = calculateMetrics(portfolioReturns);
         const portfolioVolatility = portfolioMetrics.volatility;
 
-        if (portfolioVolatility === null || benchmarks.length === 0) return;
+        if (portfolioVolatility === null || benchmarks.length === 0) {
+            lastProcessedState.current = stateKey;
+            return;
+        }
 
         let bestFitBenchmarkId: string | null = null;
         let minVolatilityDiff = Infinity;
@@ -174,19 +243,59 @@ useEffect(() => {
             }
         });
 
-        if (bestFitBenchmarkId) {
-            setSelectedBenchmarkId(bestFitBenchmarkId);
+        if (bestFitBenchmarkId && bestFitBenchmarkId !== currentAccount.selectedBenchmarkId) {
+            updateAccount(currentAccount.id, { selectedBenchmarkId: bestFitBenchmarkId });
         }
-    }, [portfolioAllocations, totalAllocation, strategies, benchmarks, benchmarkMetricsMap]);
+        
+        lastProcessedState.current = stateKey;
+    }, [currentAccount?.id, currentAccount?.portfolioAllocations, currentAccount?.selectedBenchmarkId, currentAccount?.adviserFee, totalAllocation, strategies, benchmarks, benchmarkMetricsMap, updateAccount]);
     
-    useEffect(() => {
-        if (benchmarks.length > 0 && !benchmarks.some(b => b.id === selectedBenchmarkId)) {
-            setSelectedBenchmarkId(benchmarks[0].id);
-        }
-    }, [benchmarks, selectedBenchmarkId]);
+    // Track last benchmark validation to prevent loops
+    const lastBenchmarkValidation = useRef<{
+        accountId: string | null;
+        benchmarkIds: string;
+    }>({
+        accountId: null,
+        benchmarkIds: ''
+    });
 
+    useEffect(() => {
+        if (!currentAccount || benchmarks.length === 0) {
+            if (lastBenchmarkValidation.current.accountId !== null) {
+                lastBenchmarkValidation.current = {
+                    accountId: null,
+                    benchmarkIds: ''
+                };
+            }
+            return;
+        }
+
+        const benchmarkIds = benchmarks.map(b => b.id).sort().join(',');
+        const currentBenchmarkId = currentAccount.selectedBenchmarkId;
+
+        // Skip if we've already processed this state
+        if (
+            lastBenchmarkValidation.current.accountId === currentAccount.id &&
+            lastBenchmarkValidation.current.benchmarkIds === benchmarkIds &&
+            (currentBenchmarkId === '' || benchmarks.some(b => b.id === currentBenchmarkId))
+        ) {
+            return;
+        }
+
+        if (!benchmarks.some(b => b.id === currentBenchmarkId)) {
+            updateAccount(currentAccount.id, { selectedBenchmarkId: benchmarks[0].id });
+        }
+
+        lastBenchmarkValidation.current = {
+            accountId: currentAccount.id,
+            benchmarkIds
+        };
+    }, [currentAccount?.id, currentAccount?.selectedBenchmarkId, benchmarks, updateAccount]);
+
+    // Computed allocation data for current account
     const strategyAllocationData = useMemo(() => {
-        return portfolioAllocations
+        if (!currentAccount) return [];
+        return currentAccount.portfolioAllocations
             .map(alloc => {
                 const strategy = strategies.find(s => s.id === alloc.strategyId);
                 return {
@@ -194,17 +303,18 @@ useEffect(() => {
                     value: alloc.weight,
                 };
             })
-            .filter(item => item.value > 0.01); // Filter out zero or very small allocations
-    }, [portfolioAllocations, strategies]);
+            .filter(item => item.value > 0.01);
+    }, [currentAccount?.portfolioAllocations, strategies]);
 
     const categoryAllocationData = useMemo(() => {
+        if (!currentAccount) return [];
         const totals: { [key: string]: number } = {
             'Equity': 0,
             'Fixed Income': 0,
             'Alternatives': 0,
         };
 
-        portfolioAllocations.forEach(alloc => {
+        currentAccount.portfolioAllocations.forEach(alloc => {
             const strategy = strategies.find(s => s.id === alloc.strategyId);
             if (strategy && strategy.assetAllocation) {
                 const portfolioWeight = alloc.weight / 100;
@@ -217,11 +327,12 @@ useEffect(() => {
         return Object.entries(totals)
             .map(([name, value]) => ({ name, value: value * 100 }))
             .filter(item => item.value > 0.01);
-    }, [portfolioAllocations, strategies]);
+    }, [currentAccount?.portfolioAllocations, strategies]);
 
     // Benchmark allocation data (similar to strategy allocation data)
     const benchmarkAllocationData = useMemo(() => {
-        return benchmarkAllocations
+        if (!currentAccount) return [];
+        return currentAccount.benchmarkAllocations
             .map(alloc => {
                 const benchmark = benchmarks.find(b => b.id === alloc.strategyId);
                 return {
@@ -229,17 +340,18 @@ useEffect(() => {
                     value: alloc.weight,
                 };
             })
-            .filter(item => item.value > 0.01); // Filter out zero or very small allocations
-    }, [benchmarkAllocations, benchmarks]);
+            .filter(item => item.value > 0.01);
+    }, [currentAccount?.benchmarkAllocations, benchmarks]);
 
     const benchmarkCategoryAllocationData = useMemo(() => {
+        if (!currentAccount) return [];
         const totals: { [key: string]: number } = {
             'Equity': 0,
             'Fixed Income': 0,
             'Alternatives': 0,
         };
 
-        benchmarkAllocations.forEach(alloc => {
+        currentAccount.benchmarkAllocations.forEach(alloc => {
             const benchmark = benchmarks.find(b => b.id === alloc.strategyId);
             if (benchmark && benchmark.assetAllocation) {
                 const benchmarkWeight = alloc.weight / 100;
@@ -252,9 +364,11 @@ useEffect(() => {
         return Object.entries(totals)
             .map(([name, value]) => ({ name, value: value * 100 }))
             .filter(item => item.value > 0.01);
-    }, [benchmarkAllocations, benchmarks]);
+    }, [currentAccount?.benchmarkAllocations, benchmarks]);
 
     const handleGenerateReport = useCallback(async () => {
+        if (!currentAccount) return;
+        
         if (totalAllocation !== 100) {
             alert("Total portfolio allocation must be 100%.");
             return;
@@ -265,7 +379,7 @@ useEffect(() => {
             return;
         }
 
-        const selectedStrategies = portfolioAllocations.map(alloc => {
+        const selectedStrategies = currentAccount.portfolioAllocations.map(alloc => {
             const strategy = strategies.find(s => s.id === alloc.strategyId);
             if (!strategy) throw new Error("Strategy not found");
             return {
@@ -278,8 +392,8 @@ useEffect(() => {
         let benchmarkReturns: MonthlyReturn[];
         let benchmarkName: string;
         
-        if (benchmarkAllocations.length > 0) {
-            const selectedBenchmarks = benchmarkAllocations.map(alloc => {
+        if (currentAccount.benchmarkAllocations.length > 0) {
+            const selectedBenchmarks = currentAccount.benchmarkAllocations.map(alloc => {
                 const benchmark = benchmarks.find(b => b.id === alloc.strategyId);
                 if (!benchmark) throw new Error("Benchmark not found");
                 return {
@@ -289,12 +403,12 @@ useEffect(() => {
             });
             benchmarkReturns = blendPortfolios(selectedBenchmarks);
             // Create a combined name for blended benchmarks
-            benchmarkName = benchmarkAllocations.length === 1 
-                ? benchmarks.find(b => b.id === benchmarkAllocations[0].strategyId)?.name || 'Benchmark'
+            benchmarkName = currentAccount.benchmarkAllocations.length === 1 
+                ? benchmarks.find(b => b.id === currentAccount.benchmarkAllocations[0].strategyId)?.name || 'Benchmark'
                 : 'Blended Benchmark';
         } else {
             // Fallback to single benchmark selection
-            const benchmark = benchmarks.find(b => b.id === selectedBenchmarkId);
+            const benchmark = benchmarks.find(b => b.id === currentAccount.selectedBenchmarkId);
             if (!benchmark) {
                 alert("Please select a benchmark.");
                 return;
@@ -304,13 +418,13 @@ useEffect(() => {
         }
 
         // Parse adviser fee (annual percentage)
-        const adviserFeeNum = parseFloat(adviserFee) || 0;
+        const adviserFeeNum = parseFloat(currentAccount.adviserFee) || 0;
         
         // Apply adviser fee to portfolio returns (but not benchmark - benchmarks are already net of their fees)
         const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum);
-        const investmentAmountNum = parseFloat(investmentAmount) || 0;
-        const annualDistributionNum = parseFloat(annualDistribution) || 0;
-        const clientAgeNum = parseFloat(clientAge) || 0;
+        const investmentAmountNum = parseFloat(currentAccount.investmentAmount) || 0;
+        const annualDistributionNum = parseFloat(currentAccount.annualDistribution) || 0;
+        const clientAgeNum = parseFloat(currentAccount.clientAge) || 0;
         const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
         const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
 
@@ -325,27 +439,27 @@ useEffect(() => {
             }
         };
 
-        setReportData(report);
+        updateAccount(currentAccount.id, { reportData: report });
 
         // Save proposal
         try {
             await apiService.createProposal({
                 adviser_name: adviserName,
                 client_name: clientName,
-                investment_amount: investmentAmount,
-                client_age: clientAge,
-                annual_distribution: annualDistribution,
-                risk_tolerance: riskTolerance,
-                allocations: portfolioAllocations,
-                selected_benchmark_id: selectedBenchmarkId,
-                ai_summary: aiSummary
+                investment_amount: currentAccount.investmentAmount,
+                client_age: currentAccount.clientAge,
+                annual_distribution: currentAccount.annualDistribution,
+                risk_tolerance: currentAccount.riskTolerance,
+                allocations: currentAccount.portfolioAllocations,
+                selected_benchmark_id: currentAccount.selectedBenchmarkId,
+                ai_summary: currentAccount.aiSummary
             });
         } catch (error) {
             console.error('Error saving proposal:', error);
         }
     }, [
-        totalAllocation, totalBenchmarkAllocation, portfolioAllocations, benchmarkAllocations, strategies, benchmarks, selectedBenchmarkId,
-        adviserName, clientName, investmentAmount, clientAge, annualDistribution, riskTolerance, adviserFee, aiSummary
+        currentAccount, totalAllocation, totalBenchmarkAllocation, strategies, benchmarks,
+        adviserName, clientName, updateAccount
     ]);
 
     // Admin handlers with API
@@ -389,30 +503,36 @@ useEffect(() => {
         try {
             await apiService.deleteStrategy(id);
             setStrategies(strategies.filter(s => s.id !== id));
-            // Remove deleted strategy from portfolio allocations
-            const updatedAllocations = portfolioAllocations.filter(alloc => alloc.strategyId !== id);
-            // Recalculate weights if needed to maintain 100% total
-            if (updatedAllocations.length > 0) {
-                const totalWeight = updatedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
-                if (totalWeight !== 100 && totalWeight > 0) {
-                    // Normalize weights to sum to 100%
-                    const normalizedAllocations = updatedAllocations.map(alloc => ({
-                        ...alloc,
-                        weight: Math.round((alloc.weight / totalWeight) * 100)
-                    }));
-                    // Adjust last one to ensure exact 100%
-                    const normalizedTotal = normalizedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
-                    if (normalizedTotal !== 100 && normalizedAllocations.length > 0) {
-                        normalizedAllocations[normalizedAllocations.length - 1].weight += (100 - normalizedTotal);
-                    }
-                    setPortfolioAllocations(normalizedAllocations);
-                } else {
-                    setPortfolioAllocations(updatedAllocations);
+            // Remove deleted strategy from all accounts' portfolio allocations
+            setAccounts(accounts.map(account => {
+                const updatedAllocations = account.portfolioAllocations.filter(alloc => alloc.strategyId !== id);
+                if (updatedAllocations.length === account.portfolioAllocations.length) {
+                    return account; // No change needed
                 }
-            } else {
-                // No allocations left, reset to default if strategies available
-                setPortfolioAllocations([]);
-            }
+                
+                // Recalculate weights if needed to maintain 100% total
+                if (updatedAllocations.length > 0) {
+                    const totalWeight = updatedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
+                    if (totalWeight !== 100 && totalWeight > 0) {
+                        // Normalize weights to sum to 100%
+                        const normalizedAllocations = updatedAllocations.map(alloc => ({
+                            ...alloc,
+                            weight: Math.round((alloc.weight / totalWeight) * 100)
+                        }));
+                        // Adjust last one to ensure exact 100%
+                        const normalizedTotal = normalizedAllocations.reduce((sum, alloc) => sum + alloc.weight, 0);
+                        if (normalizedTotal !== 100 && normalizedAllocations.length > 0) {
+                            normalizedAllocations[normalizedAllocations.length - 1].weight += (100 - normalizedTotal);
+                        }
+                        return { ...account, portfolioAllocations: normalizedAllocations };
+                    } else {
+                        return { ...account, portfolioAllocations: updatedAllocations };
+                    }
+                } else {
+                    // No allocations left
+                    return { ...account, portfolioAllocations: [] };
+                }
+            }));
         } catch (error) {
             console.error('Failed to delete strategy:', error);
             alert('Failed to delete strategy. Please check the console for details.');
@@ -457,13 +577,27 @@ useEffect(() => {
         try {
             await apiService.deleteBenchmark(id);
             setBenchmarks(benchmarks.filter(b => b.id !== id));
-            // If the deleted benchmark was selected, reset to first available
-            if (selectedBenchmarkId === id && benchmarks.length > 1) {
-                const remainingBenchmarks = benchmarks.filter(b => b.id !== id);
-                if (remainingBenchmarks.length > 0) {
-                    setSelectedBenchmarkId(remainingBenchmarks[0].id);
+            // Update all accounts that used this benchmark
+            const remainingBenchmarks = benchmarks.filter(b => b.id !== id);
+            setAccounts(accounts.map(account => {
+                // Update benchmark allocations
+                const updatedBenchmarkAllocations = account.benchmarkAllocations.filter(alloc => alloc.strategyId !== id);
+                
+                // Update selectedBenchmarkId if it was the deleted one
+                let newSelectedBenchmarkId = account.selectedBenchmarkId;
+                if (account.selectedBenchmarkId === id && remainingBenchmarks.length > 0) {
+                    newSelectedBenchmarkId = remainingBenchmarks[0].id;
                 }
-            }
+                
+                return {
+                    ...account,
+                    benchmarkAllocations: updatedBenchmarkAllocations.length > 0 ? updatedBenchmarkAllocations : 
+                        (remainingBenchmarks.length > 0 ? [{ strategyId: remainingBenchmarks[0].id, weight: 100 }] : []),
+                    selectedBenchmarkId: newSelectedBenchmarkId === id && remainingBenchmarks.length > 0 
+                        ? remainingBenchmarks[0].id 
+                        : newSelectedBenchmarkId
+                };
+            }));
         } catch (error) {
             console.error('Failed to delete benchmark:', error);
             alert('Failed to delete benchmark. Please check the console for details.');
@@ -492,6 +626,42 @@ useEffect(() => {
         await updateSettings({ ...settings, secondary_logo_data: logoData });
     };
 
+    // Account management handlers
+    const handleAddAccount = useCallback(() => {
+        const newAccount: Account = {
+            id: `account-${Date.now()}`,
+            accountName: `Account ${accounts.length + 1}`,
+            portfolioAllocations: [],
+            benchmarkAllocations: [],
+            selectedBenchmarkId: '',
+            reportData: null,
+            aiSummary: '',
+            investmentAmount: '',
+            clientAge: '',
+            annualDistribution: '',
+            riskTolerance: '',
+            adviserFee: ''
+        };
+        setAccounts([...accounts, newAccount]);
+        setSelectedAccountId(newAccount.id);
+    }, [accounts]);
+
+    const handleDeleteAccount = useCallback((accountId: string) => {
+        if (accounts.length <= 1) {
+            alert('Cannot delete the last account. At least one account is required.');
+            return;
+        }
+        const updatedAccounts = accounts.filter(acc => acc.id !== accountId);
+        setAccounts(updatedAccounts);
+        if (selectedAccountId === accountId) {
+            setSelectedAccountId(updatedAccounts[0]?.id || null);
+        }
+    }, [accounts, selectedAccountId]);
+
+    const handleSelectAccount = useCallback((accountId: string) => {
+        setSelectedAccountId(accountId);
+    }, []);
+
     if (strategiesState.loading || benchmarksState.loading || settingsState.loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -512,6 +682,15 @@ useEffect(() => {
                         <p className="text-gray-600 mt-1">Create compelling, data-driven investment proposals for your clients.</p>
                     </div>
                      <div className="flex items-center space-x-4">
+                        {!isAdminMode && (
+                            <>
+                                <span className="text-sm font-medium text-gray-700">Household View</span>
+                                <label htmlFor="household-toggle" className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="household-toggle" className="sr-only peer" checked={isHouseholdMode} onChange={() => setIsHouseholdMode(!isHouseholdMode)} />
+                                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </>
+                        )}
                         <span className="text-sm font-medium text-gray-700">{isAdminMode ? 'Admin Mode' : 'Adviser View'}</span>
                         <label htmlFor="admin-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="admin-toggle" className="sr-only peer" checked={isAdminMode} onChange={() => setIsAdminMode(!isAdminMode)} />
@@ -542,107 +721,269 @@ useEffect(() => {
                         onSetSecondaryLogo={handleSetSecondaryLogo}
                     />
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-1 space-y-8">
-                            <ProposalDetailsForm
-                                adviserName={adviserName}
-                                setAdviserName={setAdviserName}
-                                clientName={clientName}
-                                setClientName={setClientName}
-                                investmentAmount={investmentAmount}
-                                setInvestmentAmount={setInvestmentAmount}
-                                clientAge={clientAge}
-                                setClientAge={setClientAge}
-                                annualDistribution={annualDistribution}
-                                setAnnualDistribution={setAnnualDistribution}
-                                riskTolerance={riskTolerance}
-                                setRiskTolerance={setRiskTolerance}
-                                adviserFee={adviserFee}
-                                setAdviserFee={setAdviserFee}
-                            />
-                            <div className="bg-white p-6 rounded-lg shadow-lg">
-                                <h2 className="text-xl font-semibold mb-4 border-b pb-2">1. Configure Portfolio</h2>
-                                {strategies.length > 0 ? (
-                                    <StrategySelector
-                                        strategies={strategies}
-                                        allocations={portfolioAllocations}
-                                        setAllocations={setPortfolioAllocations}
-                                    />
-                                ) : <p className="text-gray-500">No strategies available. Please add one in the Admin Panel.</p>}
+                    isHouseholdMode ? (
+                        <div className="space-y-6">
+                            <div className="bg-white p-4 rounded-lg shadow-lg">
+                                <div className="flex space-x-4 mb-4">
+                                    <button
+                                        onClick={() => setHouseholdView('account')}
+                                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                                            householdView === 'account'
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        }`}
+                                    >
+                                        Individual Accounts
+                                    </button>
+                                    <button
+                                        onClick={() => setHouseholdView('summary')}
+                                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                                            householdView === 'summary'
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        }`}
+                                    >
+                                        Household Summary
+                                    </button>
+                                </div>
                             </div>
-                            
-                            {totalAllocation > 0 && (
-                                <AllocationCharts
-                                    strategyAllocationData={strategyAllocationData}
-                                    categoryAllocationData={categoryAllocationData}
+
+                            {householdView === 'summary' ? (
+                                <HouseholdSummary
+                                    accounts={accounts}
+                                    strategies={strategies}
+                                    benchmarks={benchmarks}
                                 />
-                            )}
-
-                            <div className="bg-white p-6 rounded-lg shadow-lg">
-                                <h2 className="text-xl font-semibold mb-1 border-b pb-2">2. Select Benchmark</h2>
-                                <p className="text-sm text-gray-500 my-3">A benchmark is automatically suggested based on portfolio volatility. You can override it below.</p>
-                                {benchmarks.length > 0 ? (
-                                    <BenchmarkSelector
-                                        benchmarks={benchmarks}
-                                        allocations={benchmarkAllocations}
-                                        setAllocations={setBenchmarkAllocations}
-                                    />
-                                ) : <p className="text-gray-500">No benchmarks available. Please add one in the Admin Panel.</p>}
-                            </div>
-
-                            <button
-                                onClick={handleGenerateReport}
-                                disabled={totalAllocation !== 100 || totalBenchmarkAllocation !== 100 || strategies.length === 0 || benchmarks.length === 0}
-                                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300 shadow-md text-lg"
-                            >
-                                Generate Report
-                            </button>
-                        </div>
-
-                        <div className="lg:col-span-2">
-                            {reportData ? (
-                               <div className="space-y-8">
-                                    <AiSummary 
-                                        reportData={reportData} 
-                                        summary={aiSummary} 
-                                        onSummaryUpdate={setAiSummary} 
-                                        clientAge={clientAge}
-                                        annualDistribution={annualDistribution}
-                                        riskTolerance={riskTolerance}
-                                        investmentAmount={investmentAmount}
-                                        clientName={clientName}
-                                        adviserName={adviserName}
-                                    />
-                                    <ReportOutput
-                                      reportData={reportData}
-                                      selectedBeforePageIds={settings.selected_before_page_ids || []}
-                                      selectedAfterPageIds={settings.selected_after_page_ids || []}
-                                      aiSummary={aiSummary}
-                                      firmLogo={settings.logo_data}
-                                      secondaryLogo={settings.secondary_logo_data}
-                                      adviserName={adviserName}
-                                      clientName={clientName}
-                                      investmentAmount={investmentAmount}
-                                      clientAge={clientAge}
-                                      annualDistribution={annualDistribution}
-                                      riskTolerance={riskTolerance}
-                                      strategyAllocationData={strategyAllocationData}
-                                      categoryAllocationData={categoryAllocationData}
-                                      benchmarkAllocationData={benchmarkAllocationData}
-                                      benchmarkCategoryAllocationData={benchmarkCategoryAllocationData}
-                                    />
-                               </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg h-full">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    <h3 className="text-2xl font-semibold text-gray-700 mt-6">Your Report Awaits</h3>
-                                    <p className="text-gray-500 mt-2 text-center">Configure your portfolio and select a benchmark, then click "Generate Report" to see the analysis.</p>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    <div className="lg:col-span-1 space-y-8">
+                                        <AccountSelector
+                                            accounts={accounts}
+                                            selectedAccountId={selectedAccountId}
+                                            onSelectAccount={handleSelectAccount}
+                                            onAddAccount={handleAddAccount}
+                                            onDeleteAccount={handleDeleteAccount}
+                                        />
+                                        {currentAccount && (
+                                            <>
+                                                <ProposalDetailsForm
+                                                    adviserName={adviserName}
+                                                    setAdviserName={setAdviserName}
+                                                    clientName={clientName}
+                                                    setClientName={setClientName}
+                                                    investmentAmount={currentAccount.investmentAmount}
+                                                    setInvestmentAmount={(val) => updateAccount(currentAccount.id, { investmentAmount: val })}
+                                                    clientAge={currentAccount.clientAge}
+                                                    setClientAge={(val) => updateAccount(currentAccount.id, { clientAge: val })}
+                                                    annualDistribution={currentAccount.annualDistribution}
+                                                    setAnnualDistribution={(val) => updateAccount(currentAccount.id, { annualDistribution: val })}
+                                                    riskTolerance={currentAccount.riskTolerance}
+                                                    setRiskTolerance={(val) => updateAccount(currentAccount.id, { riskTolerance: val })}
+                                                    adviserFee={currentAccount.adviserFee}
+                                                    setAdviserFee={(val) => updateAccount(currentAccount.id, { adviserFee: val })}
+                                                />
+                                                <div className="bg-white p-6 rounded-lg shadow-lg">
+                                                    <h2 className="text-xl font-semibold mb-4 border-b pb-2">Account: {currentAccount.accountName}</h2>
+                                                    <input
+                                                        type="text"
+                                                        value={currentAccount.accountName}
+                                                        onChange={(e) => updateAccount(currentAccount.id, { accountName: e.target.value })}
+                                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm mb-4"
+                                                        placeholder="Account Name"
+                                                    />
+                                                    <h3 className="text-lg font-semibold mb-4">1. Configure Portfolio</h3>
+                                                    {strategies.length > 0 ? (
+                                                        <StrategySelector
+                                                            strategies={strategies}
+                                                            allocations={currentAccount.portfolioAllocations}
+                                                            setAllocations={(allocs) => updateAccount(currentAccount.id, { portfolioAllocations: allocs })}
+                                                        />
+                                                    ) : <p className="text-gray-500">No strategies available. Please add one in the Admin Panel.</p>}
+                                                </div>
+                                                
+                                                {totalAllocation > 0 && (
+                                                    <AllocationCharts
+                                                        strategyAllocationData={strategyAllocationData}
+                                                        categoryAllocationData={categoryAllocationData}
+                                                    />
+                                                )}
+
+                                                <div className="bg-white p-6 rounded-lg shadow-lg">
+                                                    <h2 className="text-xl font-semibold mb-1 border-b pb-2">2. Select Benchmark</h2>
+                                                    <p className="text-sm text-gray-500 my-3">A benchmark is automatically suggested based on portfolio volatility. You can override it below.</p>
+                                                    {benchmarks.length > 0 ? (
+                                                        <BenchmarkSelector
+                                                            benchmarks={benchmarks}
+                                                            allocations={currentAccount.benchmarkAllocations}
+                                                            setAllocations={(allocs) => updateAccount(currentAccount.id, { benchmarkAllocations: allocs })}
+                                                        />
+                                                    ) : <p className="text-gray-500">No benchmarks available. Please add one in the Admin Panel.</p>}
+                                                </div>
+
+                                                <button
+                                                    onClick={handleGenerateReport}
+                                                    disabled={totalAllocation !== 100 || totalBenchmarkAllocation !== 100 || strategies.length === 0 || benchmarks.length === 0}
+                                                    className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300 shadow-md text-lg"
+                                                >
+                                                    Generate Report
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="lg:col-span-2">
+                                        {currentAccount?.reportData ? (
+                                           <div className="space-y-8">
+                                                <AiSummary 
+                                                    reportData={currentAccount.reportData} 
+                                                    summary={currentAccount.aiSummary} 
+                                                    onSummaryUpdate={(summary) => updateAccount(currentAccount.id, { aiSummary: summary })} 
+                                                    clientAge={currentAccount.clientAge}
+                                                    annualDistribution={currentAccount.annualDistribution}
+                                                    riskTolerance={currentAccount.riskTolerance}
+                                                    investmentAmount={currentAccount.investmentAmount}
+                                                    clientName={clientName}
+                                                    adviserName={adviserName}
+                                                />
+                                                <ReportOutput
+                                                  reportData={currentAccount.reportData}
+                                                  selectedBeforePageIds={settings.selected_before_page_ids || []}
+                                                  selectedAfterPageIds={settings.selected_after_page_ids || []}
+                                                  aiSummary={currentAccount.aiSummary}
+                                                  firmLogo={settings.logo_data}
+                                                  secondaryLogo={settings.secondary_logo_data}
+                                                  adviserName={adviserName}
+                                                  clientName={clientName}
+                                                  investmentAmount={currentAccount.investmentAmount}
+                                                  clientAge={currentAccount.clientAge}
+                                                  annualDistribution={currentAccount.annualDistribution}
+                                                  riskTolerance={currentAccount.riskTolerance}
+                                                  strategyAllocationData={strategyAllocationData}
+                                                  categoryAllocationData={categoryAllocationData}
+                                                  benchmarkAllocationData={benchmarkAllocationData}
+                                                  benchmarkCategoryAllocationData={benchmarkCategoryAllocationData}
+                                                />
+                                           </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg h-full">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <h3 className="text-2xl font-semibold text-gray-700 mt-6">Your Report Awaits</h3>
+                                                <p className="text-gray-500 mt-2 text-center">Configure your portfolio and select a benchmark, then click "Generate Report" to see the analysis.</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-1 space-y-8">
+                                <ProposalDetailsForm
+                                    adviserName={adviserName}
+                                    setAdviserName={setAdviserName}
+                                    clientName={clientName}
+                                    setClientName={setClientName}
+                                    investmentAmount={currentAccount?.investmentAmount || ''}
+                                    setInvestmentAmount={(val) => currentAccount && updateAccount(currentAccount.id, { investmentAmount: val })}
+                                    clientAge={currentAccount?.clientAge || ''}
+                                    setClientAge={(val) => currentAccount && updateAccount(currentAccount.id, { clientAge: val })}
+                                    annualDistribution={currentAccount?.annualDistribution || ''}
+                                    setAnnualDistribution={(val) => currentAccount && updateAccount(currentAccount.id, { annualDistribution: val })}
+                                    riskTolerance={currentAccount?.riskTolerance || ''}
+                                    setRiskTolerance={(val) => currentAccount && updateAccount(currentAccount.id, { riskTolerance: val })}
+                                    adviserFee={currentAccount?.adviserFee || ''}
+                                    setAdviserFee={(val) => currentAccount && updateAccount(currentAccount.id, { adviserFee: val })}
+                                />
+                                {currentAccount && (
+                                    <>
+                                        <div className="bg-white p-6 rounded-lg shadow-lg">
+                                            <h2 className="text-xl font-semibold mb-4 border-b pb-2">1. Configure Portfolio</h2>
+                                            {strategies.length > 0 ? (
+                                                <StrategySelector
+                                                    strategies={strategies}
+                                                    allocations={currentAccount.portfolioAllocations}
+                                                    setAllocations={(allocs) => updateAccount(currentAccount.id, { portfolioAllocations: allocs })}
+                                                />
+                                            ) : <p className="text-gray-500">No strategies available. Please add one in the Admin Panel.</p>}
+                                        </div>
+                                        
+                                        {totalAllocation > 0 && (
+                                            <AllocationCharts
+                                                strategyAllocationData={strategyAllocationData}
+                                                categoryAllocationData={categoryAllocationData}
+                                            />
+                                        )}
+
+                                        <div className="bg-white p-6 rounded-lg shadow-lg">
+                                            <h2 className="text-xl font-semibold mb-1 border-b pb-2">2. Select Benchmark</h2>
+                                            <p className="text-sm text-gray-500 my-3">A benchmark is automatically suggested based on portfolio volatility. You can override it below.</p>
+                                            {benchmarks.length > 0 ? (
+                                                <BenchmarkSelector
+                                                    benchmarks={benchmarks}
+                                                    allocations={currentAccount.benchmarkAllocations}
+                                                    setAllocations={(allocs) => updateAccount(currentAccount.id, { benchmarkAllocations: allocs })}
+                                                />
+                                            ) : <p className="text-gray-500">No benchmarks available. Please add one in the Admin Panel.</p>}
+                                        </div>
+
+                                        <button
+                                            onClick={handleGenerateReport}
+                                            disabled={totalAllocation !== 100 || totalBenchmarkAllocation !== 100 || strategies.length === 0 || benchmarks.length === 0}
+                                            className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300 shadow-md text-lg"
+                                        >
+                                            Generate Report
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="lg:col-span-2">
+                                {currentAccount?.reportData ? (
+                                   <div className="space-y-8">
+                                        <AiSummary 
+                                            reportData={currentAccount.reportData} 
+                                            summary={currentAccount.aiSummary} 
+                                            onSummaryUpdate={(summary) => updateAccount(currentAccount.id, { aiSummary: summary })} 
+                                            clientAge={currentAccount.clientAge}
+                                            annualDistribution={currentAccount.annualDistribution}
+                                            riskTolerance={currentAccount.riskTolerance}
+                                            investmentAmount={currentAccount.investmentAmount}
+                                            clientName={clientName}
+                                            adviserName={adviserName}
+                                        />
+                                        <ReportOutput
+                                          reportData={currentAccount.reportData}
+                                          selectedBeforePageIds={settings.selected_before_page_ids || []}
+                                          selectedAfterPageIds={settings.selected_after_page_ids || []}
+                                          aiSummary={currentAccount.aiSummary}
+                                          firmLogo={settings.logo_data}
+                                          secondaryLogo={settings.secondary_logo_data}
+                                          adviserName={adviserName}
+                                          clientName={clientName}
+                                          investmentAmount={currentAccount.investmentAmount}
+                                          clientAge={currentAccount.clientAge}
+                                          annualDistribution={currentAccount.annualDistribution}
+                                          riskTolerance={currentAccount.riskTolerance}
+                                          strategyAllocationData={strategyAllocationData}
+                                          categoryAllocationData={categoryAllocationData}
+                                          benchmarkAllocationData={benchmarkAllocationData}
+                                          benchmarkCategoryAllocationData={benchmarkCategoryAllocationData}
+                                        />
+                                   </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg h-full">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <h3 className="text-2xl font-semibold text-gray-700 mt-6">Your Report Awaits</h3>
+                                        <p className="text-gray-500 mt-2 text-center">Configure your portfolio and select a benchmark, then click "Generate Report" to see the analysis.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
                  )}
             </main>
         </div>

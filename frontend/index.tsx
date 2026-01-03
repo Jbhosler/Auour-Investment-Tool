@@ -49,6 +49,7 @@ window.addEventListener('unhandledrejection', (event) => {
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import PasscodeGate from './components/PasscodeGate';
 
 console.error('✅ React imports successful');
 
@@ -65,7 +66,9 @@ console.error('✅ React root created');
 try {
     root.render(
         <React.StrictMode>
-            <App />
+            <PasscodeGate>
+                <App />
+            </PasscodeGate>
         </React.StrictMode>
     );
     console.error('✅ React render called successfully');
