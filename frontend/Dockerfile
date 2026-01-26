@@ -11,9 +11,9 @@ WORKDIR /app
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-# Note: VITE_GEMINI_API_KEY uses runtime injection, so build-time is optional
-# ARG VITE_GEMINI_API_KEY
-# ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
+# VITE_GEMINI_API_KEY is provided at build time from Secret Manager
+ARG VITE_GEMINI_API_KEY
+ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
 
 # Copy package files
 COPY package*.json ./

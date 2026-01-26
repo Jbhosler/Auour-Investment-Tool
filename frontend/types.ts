@@ -66,3 +66,18 @@ export interface ReportData {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
 }
+
+export interface Account {
+    id: string;
+    accountName: string;
+    portfolioAllocations: Allocation[];
+    benchmarkAllocations: Allocation[];
+    selectedBenchmarkId: string;
+    reportData: ReportData | null;
+    aiSummary: string;
+    investmentAmount: string;
+    clientAge: string;
+    annualDistribution: string;
+    riskTolerance: string;
+    adviserFee: string;
+}

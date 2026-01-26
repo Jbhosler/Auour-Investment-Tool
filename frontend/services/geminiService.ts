@@ -95,9 +95,26 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
         // Step 2: Check API key retrieval
         diagnosticLogger.info('Step 2: Retrieving API key');
         const runtimeKey = windowEnv?.VITE_GEMINI_API_KEY;
-        // @ts-ignore - This might be defined in vite.config.ts
-        const buildTimeKey = typeof __GEMINI_API_KEY__ !== 'undefined' ? __GEMINI_API_KEY__ : undefined;
-        const apiKey = runtimeKey || buildTimeKey;
+        // Use import.meta.env which Vite replaces automatically during build
+        const buildTimeKey = import.meta.env.VITE_GEMINI_API_KEY || undefined;
+        // @ts-ignore - Fallback to define replacement if import.meta.env didn't work
+        const defineKey = typeof __GEMINI_API_KEY__ !== 'undefined' && __GEMINI_API_KEY__ !== '""' && __GEMINI_API_KEY__ !== ''
+            ? __GEMINI_API_KEY__
+            : undefined;
+        // Prefer build-time key over runtime key if runtime key is placeholder
+        // Runtime injection (via config.js) takes precedence, but only if it's not the placeholder
+        const apiKey = (runtimeKey && runtimeKey !== 'REPLACE_WITH_API_KEY') 
+            ? runtimeKey 
+            : (buildTimeKey || defineKey);
+        
+        // Enhanced diagnostics - log each value separately for clarity
+        console.error('🔍 API Key Debug - runtimeKey:', runtimeKey ? `${runtimeKey.substring(0, 10)}... (length: ${runtimeKey.length})` : 'undefined');
+        console.error('🔍 API Key Debug - buildTimeKey (import.meta.env):', buildTimeKey ? `${buildTimeKey.substring(0, 10)}... (length: ${buildTimeKey.length})` : 'undefined');
+        console.error('🔍 API Key Debug - import.meta.env.VITE_GEMINI_API_KEY:', import.meta.env.VITE_GEMINI_API_KEY ? `${import.meta.env.VITE_GEMINI_API_KEY.substring(0, 10)}... (length: ${import.meta.env.VITE_GEMINI_API_KEY.length})` : 'undefined');
+        console.error('🔍 API Key Debug - defineKey (__GEMINI_API_KEY__):', defineKey ? `${defineKey.substring(0, 10)}... (length: ${defineKey.length})` : 'undefined');
+        console.error('🔍 API Key Debug - __GEMINI_API_KEY__ exists?', typeof __GEMINI_API_KEY__ !== 'undefined' ? 'YES' : 'NO');
+        console.error('🔍 API Key Debug - finalApiKey:', apiKey ? `${apiKey.substring(0, 10)}... (length: ${apiKey.length})` : 'undefined');
+        console.error('🔍 API Key Debug - finalApiKey length:', apiKey?.length || 0);
         
         diagnosticLogger.info('API key retrieval', {
             hasRuntimeKey: !!runtimeKey,
@@ -106,15 +123,22 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
             runtimeKeyIsPlaceholder: runtimeKey === 'REPLACE_WITH_API_KEY',
             hasBuildTimeKey: !!buildTimeKey,
             buildTimeKeyLength: buildTimeKey?.length,
+            buildTimeKeyType: typeof buildTimeKey,
+            buildTimeKeyValue: buildTimeKey ? `${buildTimeKey.substring(0, 10)}...` : 'none',
+            __GEMINI_API_KEY__Exists: typeof __GEMINI_API_KEY__ !== 'undefined',
             finalApiKeyExists: !!apiKey,
             finalApiKeyLength: apiKey?.length,
             finalApiKeyIsPlaceholder: apiKey === 'REPLACE_WITH_API_KEY'
         });
         
-        if (!apiKey || apiKey === 'REPLACE_WITH_API_KEY') {
+        if (!apiKey || apiKey === 'REPLACE_WITH_API_KEY' || apiKey === '""' || apiKey === '') {
             diagnosticLogger.error('❌ API Key not available or is placeholder', {
                 apiKey,
-                apiKeyLength: apiKey?.length
+                apiKeyLength: apiKey?.length,
+                apiKeyType: typeof apiKey,
+                runtimeKey,
+                buildTimeKey,
+                __GEMINI_API_KEY__: typeof __GEMINI_API_KEY__ !== 'undefined' ? __GEMINI_API_KEY__ : 'undefined'
             });
             return "VITE_GEMINI_API_KEY environment variable not set. Please configure it to use the AI summary feature.";
         }

@@ -6,7 +6,7 @@ import { ReportData } from '../types';
 import PerformanceTable from './PerformanceTable';
 import DrawdownTable from './DrawdownTable';
 import RollingReturnsChart from './RollingReturnsChart';
-import { DownloadIcon, SaveIcon } from './icons/Icons';
+import { DownloadIcon } from './icons/Icons';
 import TitlePage from './TitlePage';
 import ReportPage from './ReportPage'; // New import
 import GrowthChart from './GrowthChart';
@@ -177,25 +177,6 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
     // Refs to capture already-rendered charts from screen
     const growthChartRef = useRef<HTMLDivElement>(null);
     const rollingReturnsChartRef = useRef<HTMLDivElement>(null);
-
-    const handleSaveReport = () => {
-        if (!reportData) {
-            alert("No report data to save.");
-            return;
-        }
-        try {
-            const dataToSave = {
-                reportData,
-                aiSummary,
-                savedAt: new Date().toISOString(),
-            };
-            localStorage.setItem('investmentProposalReport', JSON.stringify(dataToSave));
-            alert('Report saved successfully to your browser\'s local storage!');
-        } catch (error) {
-            console.error("Error saving report to local storage:", error);
-            alert("Failed to save report. Your browser's local storage might be full or disabled.");
-        }
-    };
 
     const handleDownloadPdf = async () => {
         if (isGeneratingPdf) return;
@@ -1099,16 +1080,10 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 <h2 className="text-2xl font-bold text-gray-800">Comparative Performance Analysis</h2>
                 <div className="flex items-center space-x-3">
                     <button
-                        onClick={handleSaveReport}
-                        className="flex items-center space-x-2 bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300"
-                    >
-                        <SaveIcon />
-                        <span>Save Report</span>
-                    </button>
-                    <button
                         onClick={handleDownloadPdf}
-                        disabled={isGeneratingPdf}
-                        className="flex items-center space-x-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300 disabled:bg-gray-400 disabled:cursor-wait"
+                        disabled={isGeneratingPdf || !aiSummary || aiSummary.trim() === ''}
+                        className="flex items-center space-x-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={!aiSummary || aiSummary.trim() === '' ? 'Please generate the AI summary first' : 'Download PDF report'}
                     >
                         {isGeneratingPdf ? (
                             <>

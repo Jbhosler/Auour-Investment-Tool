@@ -1,20 +1,20 @@
 steps:
 # 1. Build the Docker image for the frontend
-# VITE_API_URL is needed at build time (baked into bundle)
-# VITE_GEMINI_API_KEY uses runtime injection via entrypoint script
+# VITE_API_URL and VITE_GEMINI_API_KEY are needed at build time (baked into bundle)
 - name: 'gcr.io/cloud-builders/docker'
   id: 'Build Frontend Image'
-  dir: 'frontend'
+  entrypoint: 'bash'
   args:
-    - 'build'
-    - '--no-cache'
-    - '--build-arg'
-    - 'VITE_API_URL=https://backend-phd2mjs6qa-uc.a.run.app/api'
-    - '-t'
-    - 'gcr.io/$PROJECT_ID/frontend:latest'
-    - '-t'
-    - 'gcr.io/$PROJECT_ID/frontend:$BUILD_ID'
-    - '.'
+    - '-c'
+    - |
+      docker build \
+        --no-cache \
+        --build-arg VITE_API_URL=https://backend-phd2mjs6qa-uc.a.run.app/api \
+        --build-arg VITE_GEMINI_API_KEY=$$GEMINI_KEY \
+        -t gcr.io/$PROJECT_ID/frontend:latest \
+        -t gcr.io/$PROJECT_ID/frontend:$BUILD_ID \
+        .
+  secretEnv: ['GEMINI_KEY']
 
 # Push the image to Container Registry
 - name: 'gcr.io/cloud-builders/docker'
@@ -25,9 +25,7 @@ steps:
     - 'gcr.io/$PROJECT_ID/frontend'
 
 # 2. Deploy the built image to Cloud Run
-# The VITE_GEMINI_API_KEY env var is needed for the entrypoint script
-# to inject it into config.js at runtime
-# Use --set-secrets to properly inject the secret as an environment variable
+# Note: VITE_GEMINI_API_KEY is now baked into the bundle at build time
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: 'Deploy to Cloud Run'
   entrypoint: gcloud
@@ -44,15 +42,13 @@ steps:
     - '--allow-unauthenticated'
     - '--memory'
     - '256Mi'
+    - '--timeout'
+    - '300'
     - '--update-env-vars'
     - 'VITE_API_URL=https://backend-phd2mjs6qa-uc.a.run.app/api'
-    - '--update-secrets'
-    - 'VITE_GEMINI_API_KEY=VITE_GEMINI_API_KEY_SECRET:latest'
-  # Require the secret for the deployment step (for runtime injection)
-  secretEnv: ['_GEMINI_API_KEY']
-  
-# 3. Define where the secrets come from
+
+# 3. Define where the secrets come from (for build step)
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_NUMBER/secrets/VITE_GEMINI_API_KEY_SECRET/versions/latest
-      env: '_GEMINI_API_KEY' # This is the internal variable name used in secretEnv
+      env: 'GEMINI_KEY'

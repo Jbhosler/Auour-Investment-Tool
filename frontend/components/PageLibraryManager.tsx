@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.min.mjs';
-import { PlusCircleIcon, TrashIcon, PencilIcon } from './icons/Icons';
+import { PlusCircleIcon, TrashIcon, EditIcon } from './icons/Icons';
 import { apiService } from '../services/apiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -340,7 +340,7 @@ const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, o
                                                     aria-label="Edit page name"
                                                     title="Edit name"
                                                 >
-                                                    <PencilIcon />
+                                                    <EditIcon />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeletePage(page.id)}

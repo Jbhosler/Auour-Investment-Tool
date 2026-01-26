@@ -100,6 +100,36 @@ class ApiService {
       body: JSON.stringify(settings),
     });
   }
+
+  // Page Library
+  async getPageLibrary(positionType?: 'before' | 'after') {
+    const query = positionType ? `?position_type=${positionType}` : '';
+    return this.request(`/page-library${query}`);
+  }
+
+  async getPageFromLibrary(id: string) {
+    return this.request(`/page-library/${id}`);
+  }
+
+  async createPageInLibrary(page: { name: string; page_data: string; position_type: 'before' | 'after' }) {
+    return this.request('/page-library', {
+      method: 'POST',
+      body: JSON.stringify(page),
+    });
+  }
+
+  async updatePageInLibrary(id: string, updates: { name?: string }) {
+    return this.request(`/page-library/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deletePageFromLibrary(id: string) {
+    return this.request(`/page-library/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiService = new ApiService();

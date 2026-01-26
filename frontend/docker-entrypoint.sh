@@ -52,7 +52,7 @@ if [ -f /usr/share/nginx/html/index.html ]; then
     grep -o 'src="[^"]*index-[^"]*\.js"' /usr/share/nginx/html/index.html >&2 || echo "No bundle reference found" >&2
     echo "Checking for importmap:" >&2
     if grep -q 'importmap' /usr/share/nginx/html/index.html; then
-        echo "❌❌❌ ERROR: IMPORTMAP FOUND IN RUNNING CONTAINER!" >&2
+        echo "??? ERROR: IMPORTMAP FOUND IN RUNNING CONTAINER!" >&2
         grep -n 'importmap\|aistudiocdn' /usr/share/nginx/html/index.html >&2
         echo "Removing importmap..." >&2
         awk '/<script type="importmap">/,/<\/script>/ {next} {print}' /usr/share/nginx/html/index.html > /usr/share/nginx/html/index.html.tmp && \
@@ -61,19 +61,19 @@ if [ -f /usr/share/nginx/html/index.html ]; then
         sed -i '/<script[^>]*type="importmap"/d' /usr/share/nginx/html/index.html
         echo "Importmap removed" >&2
     else
-        echo "✅ No importmap found (correct)" >&2
+        echo "? No importmap found (correct)" >&2
     fi
     echo "All bundle files in assets:" >&2
     ls -la /usr/share/nginx/html/assets/index-*.js >&2 2>&1 || echo "No bundle files found" >&2
     echo "Checking for old bundle file index-C_9yjgEL.js:" >&2
     if [ -f /usr/share/nginx/html/assets/index-C_9yjgEL.js ]; then
-        echo "❌❌❌ ERROR: OLD BUNDLE FILE EXISTS IN RUNNING CONTAINER!" >&2
+        echo "??? ERROR: OLD BUNDLE FILE EXISTS IN RUNNING CONTAINER!" >&2
         ls -lh /usr/share/nginx/html/assets/index-C_9yjgEL.js >&2
         echo "This should not exist - removing it..." >&2
         rm -f /usr/share/nginx/html/assets/index-C_9yjgEL.js >&2
         echo "Old file removed" >&2
     else
-        echo "✅ Old bundle file does not exist (correct)" >&2
+        echo "? Old bundle file does not exist (correct)" >&2
     fi
 else
     echo "ERROR: index.html NOT FOUND!" >&2
@@ -83,4 +83,3 @@ fi
 # Start nginx
 echo "Starting nginx..." >&2
 exec nginx -g "daemon off;"
-
