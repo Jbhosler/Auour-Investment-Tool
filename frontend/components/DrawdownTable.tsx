@@ -4,6 +4,7 @@ import { Drawdown, PerformanceMetrics } from '../types';
 interface DrawdownTableProps {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
+    secondaryPortfolio?: PerformanceMetrics & { name: string };
 }
 
 const formatPercent = (value: number | null) => {
@@ -49,15 +50,18 @@ const DrawdownSubTable: React.FC<{ drawdowns: Drawdown[], name: string }> = ({ d
     </div>
 )
 
-const DrawdownTable: React.FC<DrawdownTableProps> = ({ portfolio, benchmark }) => {
+const DrawdownTable: React.FC<DrawdownTableProps> = ({ portfolio, benchmark, secondaryPortfolio }) => {
     return (
         <div>
             <div className="mb-4 pb-2 border-b border-gray-200">
                 <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Largest Drawdowns</h4>
                 <p className="text-sm text-gray-500 mt-1" style={{ fontSize: '0.8rem' }}>Historical peak-to-trough declines</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className={`grid gap-5 ${secondaryPortfolio ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                 <DrawdownSubTable drawdowns={portfolio.drawdowns} name={portfolio.name} />
+                {secondaryPortfolio && (
+                    <DrawdownSubTable drawdowns={secondaryPortfolio.drawdowns} name={secondaryPortfolio.name} />
+                )}
                 <DrawdownSubTable drawdowns={benchmark.drawdowns} name={benchmark.name} />
             </div>
         </div>

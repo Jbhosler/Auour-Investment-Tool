@@ -472,13 +472,26 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 const initialInvestment = parseFloat(investmentAmount.replace(/[^0-9.-]+/g, "")) || 1;
                 const portfolioMap = new Map(reportData.portfolio.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]));
                 const benchmarkMap = new Map(reportData.benchmark.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]));
-                const allDates = new Set([...portfolioMap.keys(), ...benchmarkMap.keys()]);
+                const secondaryMap = reportData.secondaryPortfolio 
+                    ? new Map(reportData.secondaryPortfolio.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]))
+                    : null;
+                const allDates = new Set([
+                    ...portfolioMap.keys(), 
+                    ...benchmarkMap.keys(),
+                    ...(secondaryMap ? secondaryMap.keys() : [])
+                ]);
                 const sortedDates = Array.from(allDates).sort();
-                const chartData = sortedDates.map(date => ({
-                    date,
-                    Portfolio: portfolioMap.get(date),
-                    Benchmark: benchmarkMap.get(date),
-                }));
+                const chartData = sortedDates.map(date => {
+                    const dataPoint: any = {
+                        date,
+                        Portfolio: portfolioMap.get(date),
+                    };
+                    if (secondaryMap) {
+                        dataPoint['Secondary Portfolio'] = secondaryMap.get(date);
+                    }
+                    dataPoint['Benchmark'] = benchmarkMap.get(date);
+                    return dataPoint;
+                });
 
                 // Calculate year tick positions (only January dates)
                 const yearTicks = chartData
@@ -497,7 +510,7 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 
                 return (
                     <div className="space-y-4">
-                        <PerformanceTable portfolio={reportData.portfolio} benchmark={reportData.benchmark} returnType={reportData.portfolio.returnType} />
+                        <PerformanceTable portfolio={reportData.portfolio} benchmark={reportData.benchmark} returnType={reportData.portfolio.returnType} secondaryPortfolio={reportData.secondaryPortfolio} />
                         {capturedCharts['growthChart'] ? (
                             <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
                                 {/* Removed redundant title wrapper - chart image already includes title from GrowthChart component */}
@@ -558,7 +571,13 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                                                 iconType="line"
                                             />
                                             <Line type="monotone" dataKey="Portfolio" stroke="#003365" dot={false} strokeWidth={2} name={reportData.portfolio.name} />
+                                            {reportData.secondaryPortfolio && (
+                                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={reportData.secondaryPortfolio.name} />
+                                            )}
                                             <Line type="monotone" dataKey="Benchmark" stroke="#9ca3af" dot={false} strokeWidth={2} name={reportData.benchmark.name} />
+                                            {reportData.secondaryPortfolio && (
+                                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={reportData.secondaryPortfolio.name} />
+                                            )}
                                         </LineChart>
                                     </div>
                                 </div>
@@ -583,14 +602,16 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                                 portfolio={reportData.portfolio} 
                                 benchmark={reportData.benchmark} 
                                 isPdfMode={true} 
-                                showTitle={false} 
+                                showTitle={false}
+                                secondaryPortfolio={reportData.secondaryPortfolio}
                             />
                         )}
                         {/* Drawdown Table - second */}
                         <div className="mt-6">
                             <DrawdownTable 
                                 portfolio={reportData.portfolio} 
-                                benchmark={reportData.benchmark} 
+                                benchmark={reportData.benchmark}
+                                secondaryPortfolio={reportData.secondaryPortfolio}
                             />
                         </div>
                     </div>
@@ -975,9 +996,9 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                     title: 'Returns & Drawdown Analysis',
                     component: <CombinedReturnsAndDrawdownPage />
                 },
-                (reportData.portfolio.distributionAnalysis || reportData.benchmark.distributionAnalysis) ? {
+                (reportData.portfolio.distributionAnalysis || reportData.benchmark.distributionAnalysis || reportData.secondaryPortfolio?.distributionAnalysis) ? {
                     title: 'Monte Carlo Simulation Analysis',
-                    component: <DistributionAnalysis portfolio={reportData.portfolio} benchmark={reportData.benchmark} />
+                    component: <DistributionAnalysis portfolio={reportData.portfolio} benchmark={reportData.benchmark} secondaryPortfolio={reportData.secondaryPortfolio} />
                 } : null
             // FIX: Replaced JSX.Element with React.ReactElement to fix "Cannot find namespace 'JSX'" error.
             ].filter((p): p is { title: string; component: React.ReactElement; } => p !== null);
@@ -1109,26 +1130,31 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                     portfolio={reportData.portfolio}
                     benchmark={reportData.benchmark}
                     returnType={reportData.portfolio.returnType}
+                    secondaryPortfolio={reportData.secondaryPortfolio}
                 />
                 <div ref={growthChartRef}>
                     <GrowthChart
                         portfolio={reportData.portfolio}
                         benchmark={reportData.benchmark}
                         investmentAmount={investmentAmount}
+                        secondaryPortfolio={reportData.secondaryPortfolio}
                     />
                 </div>
                 <DistributionAnalysis
                     portfolio={reportData.portfolio}
                     benchmark={reportData.benchmark}
+                    secondaryPortfolio={reportData.secondaryPortfolio}
                 />
                 <DrawdownTable 
                     portfolio={reportData.portfolio}
                     benchmark={reportData.benchmark}
+                    secondaryPortfolio={reportData.secondaryPortfolio}
                 />
                 <div ref={rollingReturnsChartRef}>
                     <RollingReturnsChart
                         portfolio={reportData.portfolio}
                         benchmark={reportData.benchmark}
+                        secondaryPortfolio={reportData.secondaryPortfolio}
                     />
                 </div>
             </div>

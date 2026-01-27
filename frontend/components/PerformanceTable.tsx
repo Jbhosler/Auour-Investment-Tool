@@ -6,6 +6,7 @@ interface PerformanceTableProps {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
     returnType: 'TWR' | 'IRR';
+    secondaryPortfolio?: PerformanceMetrics & { name: string };
 }
 
 const formatPercent = (value: number | null) => {
@@ -15,7 +16,7 @@ const formatPercent = (value: number | null) => {
 };
 
 
-const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmark, returnType }) => {
+const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmark, returnType, secondaryPortfolio }) => {
     const metrics: (keyof PerformanceMetrics['returns'] | 'volatility')[] = [
         '1 Year',
         '3 Year',
@@ -46,6 +47,9 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
                         <tr>
                             <th scope="col" className="px-4 py-2.5 font-medium uppercase tracking-wide" style={{ fontSize: '0.7rem' }}>Metric</th>
                             <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={portfolio.name}>{portfolio.name}</th>
+                            {secondaryPortfolio && (
+                                <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={secondaryPortfolio.name}>{secondaryPortfolio.name}</th>
+                            )}
                             <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={benchmark.name}>{benchmark.name}</th>
                         </tr>
                     </thead>
@@ -57,6 +61,11 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
                             const benchmarkValue = metricKey === 'volatility' 
                                 ? benchmark.volatility 
                                 : benchmark.returns[metricKey as keyof PerformanceMetrics['returns']];
+                            const secondaryValue = secondaryPortfolio 
+                                ? (metricKey === 'volatility' 
+                                    ? secondaryPortfolio.volatility 
+                                    : secondaryPortfolio.returns[metricKey as keyof PerformanceMetrics['returns']])
+                                : null;
                             
                             // Determine if portfolio outperforms
                             const outperforms = portfolioValue !== null && benchmarkValue !== null && portfolioValue > benchmarkValue;
@@ -73,6 +82,11 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
                                             <span className="ml-2 text-green-600" style={{ fontSize: '0.75rem' }}>↑</span>
                                         )}
                                     </td>
+                                    {secondaryPortfolio && (
+                                        <td className="px-4 py-3 text-right font-mono text-gray-700" style={{ fontSize: '0.85rem' }}>
+                                            {metricKey === 'volatility' ? formatPercent(secondaryValue) : formatPercent(secondaryValue)}
+                                        </td>
+                                    )}
                                     <td className="px-4 py-3 text-right font-mono text-gray-700" style={{ fontSize: '0.85rem' }}>
                                         {metricKey === 'volatility' ? formatPercent(benchmarkValue) : formatPercent(benchmarkValue)}
                                     </td>

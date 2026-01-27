@@ -130,6 +130,15 @@ class ApiService {
       method: 'DELETE',
     });
   }
+
+  // Secondary Portfolio
+  async fetchSecondaryPortfolioReturns(tickers: { ticker: string; weight: number }[], primaryReturnsDateRange: { startDate: string; endDate: string }) {
+    const weights = tickers.map(t => t.weight);
+    return this.request('/secondary-portfolio', {
+      method: 'POST',
+      body: JSON.stringify({ tickers, weights, primaryReturnsDateRange }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

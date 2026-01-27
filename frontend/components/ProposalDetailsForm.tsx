@@ -1,4 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+interface SecondaryPortfolioTicker {
+    ticker: string;
+    weight: number;
+}
 
 interface ProposalDetailsFormProps {
     adviserName: string;
@@ -15,6 +20,10 @@ interface ProposalDetailsFormProps {
     setRiskTolerance: (tolerance: string) => void;
     adviserFee: string;
     setAdviserFee: (fee: string) => void;
+    enableSecondaryPortfolio?: boolean;
+    setEnableSecondaryPortfolio?: (enabled: boolean) => void;
+    secondaryPortfolioTickers?: SecondaryPortfolioTicker[];
+    setSecondaryPortfolioTickers?: (tickers: SecondaryPortfolioTicker[]) => void;
 }
 
 const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
@@ -31,7 +40,11 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
     riskTolerance,
     setRiskTolerance,
     adviserFee,
-    setAdviserFee
+    setAdviserFee,
+    enableSecondaryPortfolio = false,
+    setEnableSecondaryPortfolio,
+    secondaryPortfolioTickers = [],
+    setSecondaryPortfolioTickers
 }) => {
 
     const formatForDisplay = (value: string) => {
@@ -52,6 +65,30 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
         const sanitizedValue = value.replace(/[^0-9]/g, '');
         setter(sanitizedValue);
     };
+
+    // Secondary Portfolio handlers
+    const handleAddTicker = () => {
+        if (setSecondaryPortfolioTickers) {
+            setSecondaryPortfolioTickers([...secondaryPortfolioTickers, { ticker: '', weight: 0 }]);
+        }
+    };
+
+    const handleRemoveTicker = (index: number) => {
+        if (setSecondaryPortfolioTickers) {
+            setSecondaryPortfolioTickers(secondaryPortfolioTickers.filter((_, i) => i !== index));
+        }
+    };
+
+    const handleTickerChange = (index: number, field: 'ticker' | 'weight', value: string | number) => {
+        if (setSecondaryPortfolioTickers) {
+            const updated = [...secondaryPortfolioTickers];
+            updated[index] = { ...updated[index], [field]: value };
+            setSecondaryPortfolioTickers(updated);
+        }
+    };
+
+    const totalWeight = secondaryPortfolioTickers.reduce((sum, t) => sum + (t.weight || 0), 0);
+    const weightError = enableSecondaryPortfolio && secondaryPortfolioTickers.length > 0 && Math.abs(totalWeight - 100) > 0.01;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -188,6 +225,102 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
                         Annual fee deducted monthly on a pro-rata basis (e.g., 1% = 0.083% per month)
                     </p>
                 </div>
+                
+                {/* Secondary Portfolio Comparison Toggle */}
+                {setEnableSecondaryPortfolio && (
+                    <div className="border-t pt-4 mt-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <label htmlFor="secondary-portfolio-toggle" className="block text-sm font-medium text-gray-700">
+                                Compare Secondary Portfolio
+                            </label>
+                            <label htmlFor="secondary-portfolio-toggle" className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    id="secondary-portfolio-toggle"
+                                    className="sr-only peer"
+                                    checked={enableSecondaryPortfolio}
+                                    onChange={(e) => setEnableSecondaryPortfolio(e.target.checked)}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        
+                        {enableSecondaryPortfolio && setSecondaryPortfolioTickers && (
+                            <div className="mt-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-sm text-gray-600">
+                                        Enter ticker symbols and allocation weights (must total 100%)
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddTicker}
+                                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        + Add Ticker
+                                    </button>
+                                </div>
+                                
+                                {secondaryPortfolioTickers.length === 0 && (
+                                    <p className="text-sm text-gray-500 italic">Click "Add Ticker" to start building your secondary portfolio.</p>
+                                )}
+                                
+                                {secondaryPortfolioTickers.map((ticker, index) => (
+                                    <div key={index} className="flex gap-2 items-start">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={ticker.ticker}
+                                                onChange={(e) => handleTickerChange(index, 'ticker', e.target.value.toUpperCase())}
+                                                placeholder="Ticker (e.g., AAPL)"
+                                                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            />
+                                        </div>
+                                        <div className="w-24">
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    value={ticker.weight || ''}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        handleTickerChange(index, 'weight', val);
+                                                    }}
+                                                    placeholder="Weight %"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-8"
+                                                />
+                                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                                    <span className="text-gray-500 text-xs">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveTicker(index)}
+                                            className="px-2 py-1 text-sm text-red-600 hover:text-red-800 focus:outline-none"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
+                                
+                                {secondaryPortfolioTickers.length > 0 && (
+                                    <div className="flex justify-between items-center pt-2 border-t">
+                                        <span className={`text-sm font-medium ${weightError ? 'text-red-600' : 'text-gray-700'}`}>
+                                            Total: {totalWeight.toFixed(2)}%
+                                        </span>
+                                        {weightError && (
+                                            <span className="text-xs text-red-600">
+                                                Weights must total exactly 100%
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

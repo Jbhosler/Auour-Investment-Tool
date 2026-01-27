@@ -57,7 +57,9 @@ const App: React.FC = () => {
                 clientAge: '',
                 annualDistribution: '',
                 riskTolerance: '',
-                adviserFee: ''
+                adviserFee: '',
+                enableSecondaryPortfolio: false,
+                secondaryPortfolioTickers: []
             };
             setAccounts([defaultAccount]);
             setSelectedAccountId(defaultAccount.id);
@@ -379,6 +381,20 @@ const App: React.FC = () => {
             return;
         }
 
+        // Validate secondary portfolio if enabled
+        if (currentAccount.enableSecondaryPortfolio) {
+            const secondaryTickers = currentAccount.secondaryPortfolioTickers || [];
+            if (secondaryTickers.length === 0) {
+                alert("Please add at least one ticker to the secondary portfolio.");
+                return;
+            }
+            const secondaryTotalWeight = secondaryTickers.reduce((sum, t) => sum + (t.weight || 0), 0);
+            if (Math.abs(secondaryTotalWeight - 100) > 0.01) {
+                alert(`Secondary portfolio weights must total 100% (current: ${secondaryTotalWeight.toFixed(2)}%).`);
+                return;
+            }
+        }
+
         const selectedStrategies = currentAccount.portfolioAllocations.map(alloc => {
             const strategy = strategies.find(s => s.id === alloc.strategyId);
             if (!strategy) throw new Error("Strategy not found");
@@ -428,6 +444,38 @@ const App: React.FC = () => {
         const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
         const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
 
+        // Fetch secondary portfolio returns if enabled
+        let secondaryPortfolioMetrics: (PerformanceMetrics & { name: string }) | undefined;
+        if (currentAccount.enableSecondaryPortfolio && currentAccount.secondaryPortfolioTickers && currentAccount.secondaryPortfolioTickers.length > 0) {
+            try {
+                // Determine date range from primary portfolio returns
+                if (portfolioReturns.length === 0) {
+                    throw new Error("Portfolio returns are empty");
+                }
+                
+                const startDate = portfolioReturns[0].date;
+                const endDate = portfolioReturns[portfolioReturns.length - 1].date;
+                
+                const secondaryResponse = await apiService.fetchSecondaryPortfolioReturns(
+                    currentAccount.secondaryPortfolioTickers,
+                    { startDate, endDate }
+                );
+                
+                const secondaryReturns: MonthlyReturn[] = secondaryResponse.returns;
+                secondaryPortfolioMetrics = {
+                    ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum),
+                    name: 'Secondary Portfolio'
+                };
+                
+                // Store the returns in the account for future reference
+                updateAccount(currentAccount.id, { secondaryPortfolioReturns: secondaryReturns });
+            } catch (error: any) {
+                console.error('Error fetching secondary portfolio:', error);
+                alert(`Failed to fetch secondary portfolio data: ${error.message || 'Unknown error'}. Please check that ticker symbols are valid and try again.`);
+                return;
+            }
+        }
+
         const report: ReportData = {
             portfolio: {
                 ...portfolioMetrics,
@@ -436,7 +484,8 @@ const App: React.FC = () => {
             benchmark: {
                 ...benchmarkMetrics,
                 name: benchmarkName
-            }
+            },
+            ...(secondaryPortfolioMetrics && { secondaryPortfolio: secondaryPortfolioMetrics })
         };
 
         updateAccount(currentAccount.id, { reportData: report });
@@ -452,7 +501,13 @@ const App: React.FC = () => {
                 risk_tolerance: currentAccount.riskTolerance,
                 allocations: currentAccount.portfolioAllocations,
                 selected_benchmark_id: currentAccount.selectedBenchmarkId,
-                ai_summary: currentAccount.aiSummary
+                ai_summary: currentAccount.aiSummary,
+                secondary_portfolio_config: currentAccount.enableSecondaryPortfolio && currentAccount.secondaryPortfolioTickers
+                    ? {
+                        enabled: currentAccount.enableSecondaryPortfolio,
+                        tickers: currentAccount.secondaryPortfolioTickers
+                    }
+                    : null
             });
         } catch (error) {
             console.error('Error saving proposal:', error);
@@ -640,7 +695,9 @@ const App: React.FC = () => {
             clientAge: '',
             annualDistribution: '',
             riskTolerance: '',
-            adviserFee: ''
+            adviserFee: '',
+            enableSecondaryPortfolio: false,
+            secondaryPortfolioTickers: []
         };
         setAccounts([...accounts, newAccount]);
         setSelectedAccountId(newAccount.id);
@@ -781,6 +838,10 @@ const App: React.FC = () => {
                                                     setRiskTolerance={(val) => updateAccount(currentAccount.id, { riskTolerance: val })}
                                                     adviserFee={currentAccount.adviserFee}
                                                     setAdviserFee={(val) => updateAccount(currentAccount.id, { adviserFee: val })}
+                                                    enableSecondaryPortfolio={currentAccount.enableSecondaryPortfolio || false}
+                                                    setEnableSecondaryPortfolio={(enabled) => updateAccount(currentAccount.id, { enableSecondaryPortfolio: enabled })}
+                                                    secondaryPortfolioTickers={currentAccount.secondaryPortfolioTickers || []}
+                                                    setSecondaryPortfolioTickers={(tickers) => updateAccount(currentAccount.id, { secondaryPortfolioTickers: tickers })}
                                                 />
                                                 <div className="bg-white p-6 rounded-lg shadow-lg">
                                                     <h2 className="text-xl font-semibold mb-4 border-b pb-2">Account: {currentAccount.accountName}</h2>
@@ -895,6 +956,10 @@ const App: React.FC = () => {
                                     setRiskTolerance={(val) => currentAccount && updateAccount(currentAccount.id, { riskTolerance: val })}
                                     adviserFee={currentAccount?.adviserFee || ''}
                                     setAdviserFee={(val) => currentAccount && updateAccount(currentAccount.id, { adviserFee: val })}
+                                    enableSecondaryPortfolio={currentAccount?.enableSecondaryPortfolio || false}
+                                    setEnableSecondaryPortfolio={(enabled) => currentAccount && updateAccount(currentAccount.id, { enableSecondaryPortfolio: enabled })}
+                                    secondaryPortfolioTickers={currentAccount?.secondaryPortfolioTickers || []}
+                                    setSecondaryPortfolioTickers={(tickers) => currentAccount && updateAccount(currentAccount.id, { secondaryPortfolioTickers: tickers })}
                                 />
                                 {currentAccount && (
                                     <>

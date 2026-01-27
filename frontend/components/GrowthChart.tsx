@@ -8,6 +8,7 @@ interface GrowthChartProps {
     isPdfMode?: boolean;
     investmentAmount?: string;
     showTitle?: boolean; // Allow title to be hidden when used in contexts with existing titles
+    secondaryPortfolio?: PerformanceMetrics & { name: string };
 }
 
 const currencyFormatter = (value: number) => {
@@ -27,25 +28,36 @@ const currencyFormatterRound = (value: number) => {
     }).format(Math.round(value));
 };
 
-const GrowthChart: React.FC<GrowthChartProps> = ({ portfolio, benchmark, isPdfMode = false, investmentAmount = '1', showTitle = true }) => {
+const GrowthChart: React.FC<GrowthChartProps> = ({ portfolio, benchmark, isPdfMode = false, investmentAmount = '1', showTitle = true, secondaryPortfolio }) => {
 
     const initialInvestment = parseFloat(investmentAmount.replace(/[^0-9.-]+/g, "")) || 1;
 
     const mergedData = useMemo(() => {
         const portfolioMap = new Map(portfolio.growthOfDollar.map(d => [d.date, d.value * initialInvestment]));
         const benchmarkMap = new Map(benchmark.growthOfDollar.map(d => [d.date, d.value * initialInvestment]));
+        const secondaryMap = secondaryPortfolio 
+            ? new Map(secondaryPortfolio.growthOfDollar.map(d => [d.date, d.value * initialInvestment]))
+            : null;
 
-        const allDates = new Set([...portfolioMap.keys(), ...benchmarkMap.keys()]);
+        const allDates = new Set([
+            ...portfolioMap.keys(), 
+            ...benchmarkMap.keys(),
+            ...(secondaryMap ? secondaryMap.keys() : [])
+        ]);
         const sortedDates = Array.from(allDates).sort();
 
         return sortedDates.map(date => {
-            return {
+            const dataPoint: any = {
                 date,
                 Portfolio: portfolioMap.get(date),
-                Benchmark: benchmarkMap.get(date),
             };
+            if (secondaryMap) {
+                dataPoint['Secondary Portfolio'] = secondaryMap.get(date);
+            }
+            dataPoint['Benchmark'] = benchmarkMap.get(date);
+            return dataPoint;
         });
-    }, [portfolio.growthOfDollar, benchmark.growthOfDollar, initialInvestment]);
+    }, [portfolio.growthOfDollar, benchmark.growthOfDollar, secondaryPortfolio?.growthOfDollar, initialInvestment]);
 
     // Calculate year tick positions (only January dates)
     const yearTicks = useMemo(() => {
@@ -111,6 +123,9 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ portfolio, benchmark, isPdfMo
                             iconType="line"
                         />
                         <Line type="monotone" dataKey="Portfolio" stroke="#003365" dot={false} strokeWidth={2} name={portfolio.name} />
+                        {secondaryPortfolio && (
+                            <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={secondaryPortfolio.name} />
+                        )}
                         <Line type="monotone" dataKey="Benchmark" stroke="#9ca3af" dot={false} strokeWidth={2} name={benchmark.name} />
                     </LineChart>
                 ) : (
@@ -155,6 +170,9 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ portfolio, benchmark, isPdfMo
                                 iconType="line"
                             />
                             <Line type="monotone" dataKey="Portfolio" stroke="#003365" dot={false} strokeWidth={2} name={portfolio.name} />
+                            {secondaryPortfolio && (
+                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={secondaryPortfolio.name} />
+                            )}
                             <Line type="monotone" dataKey="Benchmark" stroke="#9ca3af" dot={false} strokeWidth={2} name={benchmark.name} />
                         </LineChart>
                     </ResponsiveContainer>

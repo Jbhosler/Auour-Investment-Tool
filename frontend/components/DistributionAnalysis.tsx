@@ -4,6 +4,7 @@ import { PerformanceMetrics } from '../types';
 interface DistributionAnalysisProps {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
+    secondaryPortfolio?: PerformanceMetrics & { name: string };
 }
 
 const formatCurrency = (value: number | null) => {
@@ -72,11 +73,11 @@ const ResultCard: React.FC<{ name: string; data: PerformanceMetrics['distributio
     );
 };
 
-const DistributionAnalysis: React.FC<DistributionAnalysisProps> = ({ portfolio, benchmark }) => {
+const DistributionAnalysis: React.FC<DistributionAnalysisProps> = ({ portfolio, benchmark, secondaryPortfolio }) => {
     
-    const showComponent = portfolio.distributionAnalysis || benchmark.distributionAnalysis;
+    const showComponent = portfolio.distributionAnalysis || benchmark.distributionAnalysis || secondaryPortfolio?.distributionAnalysis;
     
-    if (!showComponent) return null; // Don't render anything if no data is available for either
+    if (!showComponent) return null; // Don't render anything if no data is available for any
     
     return (
         <div>
@@ -84,8 +85,11 @@ const DistributionAnalysis: React.FC<DistributionAnalysisProps> = ({ portfolio, 
                 <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Hypothetical Distribution Analysis</h4>
                 <p className="text-sm text-gray-500 mt-1" style={{ fontSize: '0.8rem' }}>Monte Carlo simulation to age 95</p>
             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+             <div className={`grid gap-5 ${secondaryPortfolio ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                 <ResultCard name={portfolio.name} data={portfolio.distributionAnalysis} />
+                {secondaryPortfolio && (
+                    <ResultCard name={secondaryPortfolio.name} data={secondaryPortfolio.distributionAnalysis} />
+                )}
                 <ResultCard name={benchmark.name} data={benchmark.distributionAnalysis} />
             </div>
             {/* Lighter disclaimer styling */}

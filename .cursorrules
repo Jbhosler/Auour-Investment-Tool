@@ -1,0 +1,31 @@
+# Auour Investment Proposal Tool - Cloud-First Development Rules
+
+## Project Context
+- **Environment**: No local testing is performed; all development, testing, and verification occur directly on **Google Cloud Platform (GCP)**.
+- **Tech Stack**: React (Vite) frontend, Node.js (Express) backend.
+- **Deployment**: Both services run on **Cloud Run** and are deployed via **Cloud Build**.
+
+## Core Architecture & Secrets
+- **Gemini API Key (Dual-Injection)**:
+  - **Build-Time (Primary)**: Injected via `VITE_GEMINI_API_KEY` in `frontend/cloudbuild.yaml` using `--build-arg`. This is baked into the bundle by Vite's `define` plugin.
+  - **Runtime (Secondary)**: Provided via `window.__ENV__` in `frontend/public/config.js`, managed by the container's `docker-entrypoint.sh`.
+- **Service Logic**: Always maintain the fallback logic in `frontend/services/geminiService.ts` that checks both `runtimeKey` and `buildTimeKey`.
+
+## Tech-Specific Constraints
+
+### Deployment & CI/CD (Critical)
+- **Source of Truth**: `frontend/cloudbuild.yaml` and `backend/Dockerfile` are the definitive references for how the app functions.
+- **Secret Management**: API keys and sensitive credentials must be pulled from **Google Secret Manager** during the build or deploy steps.
+- **Vite Bundling**: The `frontend/Dockerfile` contains specific `awk` and `sed` logic to remove `importmaps` that conflict with `@google/generative-ai`. Do not remove these cleanup steps.
+
+### Backend (Node.js)
+- **Database**: The app is configured to use **PostgreSQL** in production. Ensure `backend/database.js` remains compatible with the Cloud SQL environment.
+- **CORS**: Updates to frontend domains must be reflected in the `allowedOrigins` array in `backend/server.js`.
+
+### Frontend (React + Vite)
+- **API Communication**: All frontend calls to the backend must use the centralized `frontend/services/apiService.ts` to ensure requests are routed to the correct Cloud Run service URL.
+- **Security**: The Gemini API key is restricted via **HTTP Referrer** in the GCP Console. Any new domains (e.g., `auourproposal.com/*`) must be added to the authorized list in the console.
+
+## Workflow Requirements
+- **Cloud Build Verification**: After any commit, verify the build logs in GCP to ensure that the `VITE_GEMINI_API_KEY` was successfully passed through as a build argument.
+- **Diagnostic Logging**: Utilize the `diagnosticLogger` for all AI-related features. Since there is no local console to monitor, these logs are vital for troubleshooting issues within the Cloud Run logs.

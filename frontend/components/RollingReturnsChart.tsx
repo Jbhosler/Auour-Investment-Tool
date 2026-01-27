@@ -7,14 +7,16 @@ interface RollingReturnsChartProps {
     benchmark: PerformanceMetrics & { name: string };
     isPdfMode?: boolean;
     showTitle?: boolean; // Allow title to be hidden when used in contexts with existing titles
+    secondaryPortfolio?: PerformanceMetrics & { name: string };
 }
 
-const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, benchmark, isPdfMode = false, showTitle = true }) => {
+const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, benchmark, isPdfMode = false, showTitle = true, secondaryPortfolio }) => {
 
     const mergedData = useMemo(() => {
         const allKeys = new Set([
             ...portfolio.rollingReturnsDistribution.map(d => d.name),
-            ...benchmark.rollingReturnsDistribution.map(d => d.name)
+            ...benchmark.rollingReturnsDistribution.map(d => d.name),
+            ...(secondaryPortfolio ? secondaryPortfolio.rollingReturnsDistribution.map(d => d.name) : [])
         ]);
 
         const sortedKeys = Array.from(allKeys).sort((a,b) => parseFloat(a) - parseFloat(b));
@@ -22,13 +24,20 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
         return sortedKeys.map(key => {
             const portfolioPoint = portfolio.rollingReturnsDistribution.find(d => d.name === key);
             const benchmarkPoint = benchmark.rollingReturnsDistribution.find(d => d.name === key);
-            return {
+            const secondaryPoint = secondaryPortfolio 
+                ? secondaryPortfolio.rollingReturnsDistribution.find(d => d.name === key)
+                : null;
+            const dataPoint: any = {
                 name: key,
                 Portfolio: portfolioPoint ? portfolioPoint.value : 0,
-                Benchmark: benchmarkPoint ? benchmarkPoint.value : 0,
             };
+            if (secondaryPortfolio) {
+                dataPoint['Secondary Portfolio'] = secondaryPoint ? secondaryPoint.value : 0;
+            }
+            dataPoint['Benchmark'] = benchmarkPoint ? benchmarkPoint.value : 0;
+            return dataPoint;
         });
-    }, [portfolio.rollingReturnsDistribution, benchmark.rollingReturnsDistribution]);
+    }, [portfolio.rollingReturnsDistribution, benchmark.rollingReturnsDistribution, secondaryPortfolio?.rollingReturnsDistribution]);
 
 
     return (
@@ -40,7 +49,7 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                 </div>
             )}
             {/* Lighter styling for stats section with adequate padding to prevent cutoff */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 text-sm mb-1 p-2.5 pb-3 bg-gray-50 rounded-lg border border-gray-200 mx-0">
+            <div className={`grid gap-x-6 text-sm mb-1 p-2.5 pb-3 bg-gray-50 rounded-lg border border-gray-200 mx-0 ${secondaryPortfolio ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                 <div className="border-b md:border-b-0 md:border-r border-gray-200 pr-3 pb-2.5 md:pb-0 mb-2 md:mb-0">
                     <p className="font-medium text-gray-700 break-words" title={portfolio.name} style={{ fontSize: '0.85rem', marginBottom: '8px' }}>{portfolio.name}</p>
                     <div className="flex justify-between mt-1.5">
@@ -52,6 +61,19 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                         <span className="text-red-600 font-semibold" style={{ fontSize: '0.8rem' }}>{portfolio.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
                     </div>
                 </div>
+                {secondaryPortfolio && (
+                    <div className="border-b md:border-b-0 md:border-r border-gray-200 pr-3 pb-2.5 md:pb-0 mb-2 md:mb-0 pl-2">
+                        <p className="font-medium text-gray-700 break-words" title={secondaryPortfolio.name} style={{ fontSize: '0.85rem', marginBottom: '8px' }}>{secondaryPortfolio.name}</p>
+                        <div className="flex justify-between mt-1.5">
+                            <span className="text-gray-600" style={{ fontSize: '0.8rem' }}>Positive Periods:</span>
+                            <span className="text-green-600 font-semibold" style={{ fontSize: '0.8rem' }}>{secondaryPortfolio.rollingReturnsAnalysis.percentPositive.toFixed(1)}%</span>
+                        </div>
+                         <div className="flex justify-between mt-1.5">
+                            <span className="text-gray-600" style={{ fontSize: '0.8rem' }}>Negative Periods:</span>
+                            <span className="text-red-600 font-semibold" style={{ fontSize: '0.8rem' }}>{secondaryPortfolio.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                )}
                  <div className="pl-2">
                     <p className="font-medium text-gray-700 break-words" title={benchmark.name} style={{ fontSize: '0.85rem', marginBottom: '8px' }}>{benchmark.name}</p>
                     <div className="flex justify-between mt-1.5">
@@ -100,6 +122,9 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                             wrapperStyle={{ paddingTop: '10px', fontSize: '11px', color: '#4b5563' }}
                         />
                         <Bar dataKey="Portfolio" fill="#003365" name={portfolio.name} />
+                        {secondaryPortfolio && (
+                            <Bar dataKey="Secondary Portfolio" fill="#10b981" name={secondaryPortfolio.name} />
+                        )}
                         <Bar dataKey="Benchmark" fill="#9ca3af" name={benchmark.name} />
                     </BarChart>
                 ) : (
@@ -135,6 +160,9 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                                 wrapperStyle={{ paddingTop: '10px', fontSize: '11px', color: '#4b5563' }}
                             />
                             <Bar dataKey="Portfolio" fill="#003365" name={portfolio.name} />
+                            {secondaryPortfolio && (
+                                <Bar dataKey="Secondary Portfolio" fill="#10b981" name={secondaryPortfolio.name} />
+                            )}
                             <Bar dataKey="Benchmark" fill="#9ca3af" name={benchmark.name} />
                         </BarChart>
                     </ResponsiveContainer>

@@ -69,6 +69,7 @@ const prepareForStorage = (data) => {
     if (prepared.allocations) prepared.allocations = JSON.stringify(prepared.allocations);
     if (prepared.before_output_pages) prepared.before_output_pages = JSON.stringify(prepared.before_output_pages);
     if (prepared.after_output_pages) prepared.after_output_pages = JSON.stringify(prepared.after_output_pages);
+    if (prepared.secondary_portfolio_config) prepared.secondary_portfolio_config = JSON.stringify(prepared.secondary_portfolio_config);
     return prepared;
   }
   return data;
@@ -85,6 +86,7 @@ const prepareFromStorage = (data) => {
     if (typeof prepared.after_output_pages === 'string') prepared.after_output_pages = JSON.parse(prepared.after_output_pages);
     if (typeof prepared.selected_before_page_ids === 'string') prepared.selected_before_page_ids = JSON.parse(prepared.selected_before_page_ids);
     if (typeof prepared.selected_after_page_ids === 'string') prepared.selected_after_page_ids = JSON.parse(prepared.selected_after_page_ids);
+    if (typeof prepared.secondary_portfolio_config === 'string') prepared.secondary_portfolio_config = JSON.parse(prepared.secondary_portfolio_config);
     return prepared;
   }
   return data;
@@ -340,7 +342,8 @@ app.post('/api/proposals', async (req, res) => {
       risk_tolerance,
       allocations,
       selected_benchmark_id,
-      ai_summary
+      ai_summary,
+      secondary_portfolio_config
     } = req.body;
     
     // Validate allocations
@@ -352,10 +355,10 @@ app.post('/api/proposals', async (req, res) => {
     const sql = isSQLite()
       ? `INSERT INTO proposals (id, adviser_name, client_name, investment_amount, 
          client_age, annual_distribution, risk_tolerance, allocations, 
-         selected_benchmark_id, ai_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         selected_benchmark_id, ai_summary, secondary_portfolio_config) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       : `INSERT INTO proposals (id, adviser_name, client_name, investment_amount, 
          client_age, annual_distribution, risk_tolerance, allocations, 
-         selected_benchmark_id, ai_summary) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`;
+         selected_benchmark_id, ai_summary, secondary_portfolio_config) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`;
     
     const params = [
       proposalId,
@@ -367,7 +370,8 @@ app.post('/api/proposals', async (req, res) => {
       risk_tolerance,
       JSON.stringify(allocations),
       selected_benchmark_id,
-      ai_summary
+      ai_summary,
+      secondary_portfolio_config ? JSON.stringify(secondary_portfolio_config) : null
     ];
     
     await query(sql, params);
@@ -376,6 +380,40 @@ app.post('/api/proposals', async (req, res) => {
   } catch (error) {
     console.error('Error creating proposal:', error);
     res.status(500).json({ error: 'Failed to create proposal' });
+  }
+});
+
+// ============ SECONDARY PORTFOLIO ROUTE ============
+
+// Fetch secondary portfolio returns from Alpha Vantage
+app.post('/api/secondary-portfolio', express.json(), async (req, res) => {
+  try {
+    const { tickers, weights, primaryReturnsDateRange } = req.body;
+    
+    if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
+      return res.status(400).json({ error: 'Tickers array is required' });
+    }
+    
+    if (!weights || !Array.isArray(weights) || weights.length !== tickers.length) {
+      return res.status(400).json({ error: 'Weights array must match tickers length' });
+    }
+    
+    if (!primaryReturnsDateRange || !primaryReturnsDateRange.startDate || !primaryReturnsDateRange.endDate) {
+      return res.status(400).json({ error: 'Primary returns date range is required' });
+    }
+    
+    // Import the ticker service
+    const { fetchSecondaryPortfolioReturns } = await import('./tickerService.js');
+    
+    const returns = await fetchSecondaryPortfolioReturns(tickers, weights, primaryReturnsDateRange);
+    
+    res.json({ returns });
+  } catch (error) {
+    console.error('Error fetching secondary portfolio:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch secondary portfolio data',
+      details: error.message 
+    });
   }
 });
 

@@ -77,6 +77,20 @@ try {
     Write-Host "Note: DATABASE_URL secret not found. You may need to set it manually." -ForegroundColor Yellow
 }
 
+# Add TICKER_API_KEY secret if it exists (for Alpha Vantage)
+try {
+    $secrets = gcloud secrets list --format="value(name)" 2>&1
+    if ($secrets -match "ticker-api-key") {
+        $deployCmd += " --set-secrets `"TICKER_API_KEY=ticker-api-key:latest`""
+        Write-Host "Will use TICKER_API_KEY from Secret Manager" -ForegroundColor Green
+    } else {
+        Write-Host "Note: TICKER_API_KEY secret not found. Secondary portfolio feature will not work." -ForegroundColor Yellow
+        Write-Host "      Create it with: gcloud secrets create ticker-api-key --data-file=-" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "Note: TICKER_API_KEY secret not found. Secondary portfolio feature will not work." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "Deployment command:" -ForegroundColor Cyan
 Write-Host $deployCmd -ForegroundColor Gray

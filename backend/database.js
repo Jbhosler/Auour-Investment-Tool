@@ -48,6 +48,7 @@ if (USE_SQLITE) {
       allocations TEXT NOT NULL,
       selected_benchmark_id TEXT,
       ai_summary TEXT,
+      secondary_portfolio_config TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -137,6 +138,7 @@ if (USE_SQLITE) {
           allocations JSONB NOT NULL,
           selected_benchmark_id TEXT,
           ai_summary TEXT,
+          secondary_portfolio_config JSONB,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
@@ -173,44 +175,65 @@ if (USE_SQLITE) {
         }
       }
 
-      // Add missing columns to firm_settings if they don't exist
-      // This is critical - must succeed
-      try {
-        // Check if columns exist
-        const columnsCheck = await db.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'firm_settings' 
-          AND column_name IN ('selected_before_page_ids', 'selected_after_page_ids', 'secondary_logo_data')
-        `);
-        
-        const existingColumns = columnsCheck.rows.map(r => r.column_name);
-        const needsBefore = !existingColumns.includes('selected_before_page_ids');
-        const needsAfter = !existingColumns.includes('selected_after_page_ids');
-        const needsSecondaryLogo = !existingColumns.includes('secondary_logo_data');
-        
-        if (needsBefore || needsAfter || needsSecondaryLogo) {
-          console.log('Adding missing columns to firm_settings...');
-          if (needsBefore) {
-            await db.query('ALTER TABLE firm_settings ADD COLUMN selected_before_page_ids JSONB DEFAULT \'[]\'::jsonb');
-            console.log('✅ Added selected_before_page_ids column');
+        // Add missing columns to firm_settings if they don't exist
+        // This is critical - must succeed
+        try {
+          // Check if columns exist
+          const columnsCheck = await db.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'firm_settings' 
+            AND column_name IN ('selected_before_page_ids', 'selected_after_page_ids', 'secondary_logo_data')
+          `);
+          
+          const existingColumns = columnsCheck.rows.map(r => r.column_name);
+          const needsBefore = !existingColumns.includes('selected_before_page_ids');
+          const needsAfter = !existingColumns.includes('selected_after_page_ids');
+          const needsSecondaryLogo = !existingColumns.includes('secondary_logo_data');
+          
+          if (needsBefore || needsAfter || needsSecondaryLogo) {
+            console.log('Adding missing columns to firm_settings...');
+            if (needsBefore) {
+              await db.query('ALTER TABLE firm_settings ADD COLUMN selected_before_page_ids JSONB DEFAULT \'[]\'::jsonb');
+              console.log('✅ Added selected_before_page_ids column');
+            }
+            if (needsAfter) {
+              await db.query('ALTER TABLE firm_settings ADD COLUMN selected_after_page_ids JSONB DEFAULT \'[]\'::jsonb');
+              console.log('✅ Added selected_after_page_ids column');
+            }
+            if (needsSecondaryLogo) {
+              await db.query('ALTER TABLE firm_settings ADD COLUMN secondary_logo_data TEXT');
+              console.log('✅ Added secondary_logo_data column');
+            }
+          } else {
+            console.log('✅ Firm settings columns already exist');
           }
-          if (needsAfter) {
-            await db.query('ALTER TABLE firm_settings ADD COLUMN selected_after_page_ids JSONB DEFAULT \'[]\'::jsonb');
-            console.log('✅ Added selected_after_page_ids column');
-          }
-          if (needsSecondaryLogo) {
-            await db.query('ALTER TABLE firm_settings ADD COLUMN secondary_logo_data TEXT');
-            console.log('✅ Added secondary_logo_data column');
-          }
-        } else {
-          console.log('✅ Firm settings columns already exist');
+        } catch (alterError) {
+          console.error('❌ CRITICAL: Error adding firm_settings columns:', alterError.message);
+          console.error('Error details:', alterError);
+          // Don't throw - allow server to start, but log the error
         }
-      } catch (alterError) {
-        console.error('❌ CRITICAL: Error adding firm_settings columns:', alterError.message);
-        console.error('Error details:', alterError);
-        // Don't throw - allow server to start, but log the error
-      }
+
+        // Add missing columns to proposals table if they don't exist
+        try {
+          const proposalsColumnsCheck = await db.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'proposals' 
+            AND column_name = 'secondary_portfolio_config'
+          `);
+          
+          if (proposalsColumnsCheck.rows.length === 0) {
+            console.log('Adding secondary_portfolio_config column to proposals...');
+            await db.query('ALTER TABLE proposals ADD COLUMN secondary_portfolio_config JSONB');
+            console.log('✅ Added secondary_portfolio_config column to proposals');
+          } else {
+            console.log('✅ secondary_portfolio_config column already exists in proposals');
+          }
+        } catch (alterError) {
+          console.error('❌ Error adding secondary_portfolio_config column:', alterError.message);
+          // Don't throw - allow server to start
+        }
 
       // Insert default firm settings
       try {

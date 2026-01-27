@@ -65,6 +65,12 @@ export interface Drawdown {
 export interface ReportData {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
+    secondaryPortfolio?: PerformanceMetrics & { name: string };
+}
+
+export interface SecondaryPortfolioTicker {
+    ticker: string;
+    weight: number;
 }
 
 export interface Account {
@@ -80,4 +86,7 @@ export interface Account {
     annualDistribution: string;
     riskTolerance: string;
     adviserFee: string;
+    enableSecondaryPortfolio?: boolean;
+    secondaryPortfolioTickers?: SecondaryPortfolioTicker[];
+    secondaryPortfolioReturns?: MonthlyReturn[];
 }
