@@ -20,6 +20,12 @@ const calculateAnnualizedVolatility = (returns: MonthlyReturn[]): number | null 
     return stdDev * Math.sqrt(12);
 };
 
+/**
+ * Largest drawdowns from peak to trough. Tracks running peak; when wealth falls,
+ * records the minimum (trough) until a new peak. Returns worst 3 by magnitude.
+ * Do not reset currentDrawdown when entering a drawdown—otherwise the first
+ * trough can be overwritten by a later, smaller drawdown (e.g. during recovery).
+ */
 const calculateDrawdowns = (returns: MonthlyReturn[]): Drawdown[] => {
     if (returns.length === 0) return [];
 
@@ -62,7 +68,6 @@ const calculateDrawdowns = (returns: MonthlyReturn[]): Drawdown[] => {
                  troughDate = currentDate;
                  if (!inDrawdown) {
                      inDrawdown = true;
-                     currentDrawdown = 0; // Reset to find new trough
                  }
             }
         }
