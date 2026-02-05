@@ -12,8 +12,17 @@ class ApiService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'API request failed');
+        let body: { message?: string; details?: string; error?: string; responsePreview?: Record<string, string>; dataKeys?: string[] } = {};
+        try {
+          body = await response.json();
+        } catch {
+          body = { message: response.statusText || 'API request failed' };
+        }
+        const message = body.message ?? body.details ?? body.error ?? 'API request failed';
+        const err = new Error(message) as Error & { responsePreview?: Record<string, string>; dataKeys?: string[] };
+        if (body.responsePreview) err.responsePreview = body.responsePreview;
+        if (body.dataKeys) err.dataKeys = body.dataKeys;
+        throw err;
       }
 
       return await response.json();

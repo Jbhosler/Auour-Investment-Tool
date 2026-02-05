@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation, Account } from './types';
+import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation, Account, SecondaryPortfolioTicker } from './types';
 import { blendPortfolios, calculateMetrics } from './services/performanceCalculator';
 import { apiService } from './services/apiService';
 import { useApiState, useSettingsState } from './hooks/useApiState';
@@ -13,6 +13,12 @@ import AllocationCharts from './components/AllocationCharts';
 import ProposalDetailsForm from './components/ProposalDetailsForm';
 import AccountSelector from './components/AccountSelector';
 import HouseholdSummary from './components/HouseholdSummary';
+
+/** Returns true if the two ticker arrays have the same tickers and weights (order-sensitive). */
+function secondaryTickersMatch(a: SecondaryPortfolioTicker[] | undefined, b: SecondaryPortfolioTicker[] | undefined): boolean {
+    if (!a || !b || a.length !== b.length) return false;
+    return a.every((t, i) => t.ticker === b[i].ticker && Math.abs((t.weight ?? 0) - (b[i].weight ?? 0)) < 0.01);
+}
 
 const App: React.FC = () => {
     const [isAdminMode, setIsAdminMode] = useState(false);
@@ -444,35 +450,52 @@ const App: React.FC = () => {
         const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
         const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
 
-        // Fetch secondary portfolio returns if enabled
+        // Fetch secondary portfolio returns if enabled (reuse cached returns when tickers and date range unchanged)
         let secondaryPortfolioMetrics: (PerformanceMetrics & { name: string }) | undefined;
         if (currentAccount.enableSecondaryPortfolio && currentAccount.secondaryPortfolioTickers && currentAccount.secondaryPortfolioTickers.length > 0) {
-            try {
-                // Determine date range from primary portfolio returns
-                if (portfolioReturns.length === 0) {
-                    throw new Error("Portfolio returns are empty");
-                }
-                
-                const startDate = portfolioReturns[0].date;
-                const endDate = portfolioReturns[portfolioReturns.length - 1].date;
-                
-                const secondaryResponse = await apiService.fetchSecondaryPortfolioReturns(
-                    currentAccount.secondaryPortfolioTickers,
-                    { startDate, endDate }
-                );
-                
-                const secondaryReturns: MonthlyReturn[] = secondaryResponse.returns;
+            if (portfolioReturns.length === 0) {
+                alert("Portfolio returns are empty.");
+                return;
+            }
+            const startDate = portfolioReturns[0].date;
+            const endDate = portfolioReturns[portfolioReturns.length - 1].date;
+            const cachedReturns = currentAccount.secondaryPortfolioReturns;
+            const cacheTickers = currentAccount.secondaryPortfolioCacheTickers;
+            const canUseCache = cachedReturns && cachedReturns.length > 0
+                && cacheTickers && secondaryTickersMatch(currentAccount.secondaryPortfolioTickers, cacheTickers)
+                && cachedReturns[0].date <= startDate && cachedReturns[cachedReturns.length - 1].date >= endDate;
+
+            if (canUseCache) {
+                const secondaryReturns = cachedReturns.filter(r => r.date >= startDate && r.date <= endDate);
                 secondaryPortfolioMetrics = {
                     ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum),
                     name: 'Secondary Portfolio'
                 };
-                
-                // Store the returns in the account for future reference
-                updateAccount(currentAccount.id, { secondaryPortfolioReturns: secondaryReturns });
-            } catch (error: any) {
-                console.error('Error fetching secondary portfolio:', error);
-                alert(`Failed to fetch secondary portfolio data: ${error.message || 'Unknown error'}. Please check that ticker symbols are valid and try again.`);
-                return;
+            } else {
+                try {
+                    const secondaryResponse = await apiService.fetchSecondaryPortfolioReturns(
+                        currentAccount.secondaryPortfolioTickers,
+                        { startDate, endDate }
+                    );
+                    const secondaryReturns: MonthlyReturn[] = secondaryResponse.returns;
+                    secondaryPortfolioMetrics = {
+                        ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum),
+                        name: 'Secondary Portfolio'
+                    };
+                    updateAccount(currentAccount.id, {
+                        secondaryPortfolioReturns: secondaryReturns,
+                        secondaryPortfolioCacheTickers: currentAccount.secondaryPortfolioTickers.map(t => ({ ticker: t.ticker, weight: t.weight }))
+                    });
+                } catch (error: any) {
+                    console.error('Error fetching secondary portfolio:', error);
+                    let msg = error?.message || 'Unknown error';
+                    if (error?.responsePreview && typeof error.responsePreview === 'object') {
+                        msg += '\n\nAPI response keys: ' + (error.dataKeys?.join(', ') || Object.keys(error.responsePreview).join(', '));
+                        msg += '\nPreview: ' + JSON.stringify(error.responsePreview);
+                    }
+                    alert(`Failed to fetch secondary portfolio data: ${msg}\n\nPlease check that ticker symbols are valid and try again.`);
+                    return;
+                }
             }
         }
 

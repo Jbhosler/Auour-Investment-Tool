@@ -409,11 +409,16 @@ app.post('/api/secondary-portfolio', express.json(), async (req, res) => {
     
     res.json({ returns });
   } catch (error) {
-    console.error('Error fetching secondary portfolio:', error);
-    res.status(500).json({ 
+    const message = error?.message || 'Failed to fetch secondary portfolio data';
+    console.error('Secondary portfolio error:', message, error?.stack || '');
+    const body = { 
       error: 'Failed to fetch secondary portfolio data',
-      details: error.message 
-    });
+      message,
+      details: message 
+    };
+    if (error?.responsePreview) body.responsePreview = error.responsePreview;
+    if (error?.dataKeys) body.dataKeys = error.dataKeys;
+    res.status(500).json(body);
   }
 });
 
@@ -724,6 +729,24 @@ app.delete('/api/page-library/:id', async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', database: isSQLite() ? 'SQLite' : 'PostgreSQL' });
+});
+
+// Ticker API key status (safe to call: only shows fingerprint, never the full key)
+app.get('/api/ticker-api-status', (req, res) => {
+  const raw = (process.env.TICKER_API_KEY || '').trim();
+  const configured = raw.length > 0;
+  const keyLength = raw.length;
+  const keyFingerprint = configured && keyLength >= 8
+    ? `${raw.slice(0, 4)}...${raw.slice(-4)}`
+    : null;
+  res.json({
+    configured,
+    keyLength: configured ? keyLength : 0,
+    keyFingerprint,
+    message: configured
+      ? `Key is set (${keyLength} chars). Confirm fingerprint matches your Alpha Vantage key: ${keyFingerprint}`
+      : 'TICKER_API_KEY is not set. Set it in .env (local) or via Secret Manager (Cloud Run).'
+  });
 });
 
 // Manual database initialization endpoint (for troubleshooting)

@@ -89,4 +89,6 @@ export interface Account {
     enableSecondaryPortfolio?: boolean;
     secondaryPortfolioTickers?: SecondaryPortfolioTicker[];
     secondaryPortfolioReturns?: MonthlyReturn[];
+    /** Tickers used when secondaryPortfolioReturns was last fetched; used to skip API when unchanged */
+    secondaryPortfolioCacheTickers?: SecondaryPortfolioTicker[];
 }

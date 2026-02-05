@@ -38,6 +38,11 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
             <div className="mb-4 pb-2 border-b border-gray-200">
                 <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Key Performance Metrics</h4>
                 <p className="text-sm text-gray-500 mt-1" style={{ fontSize: '0.8rem' }}>Comparative analysis of portfolio vs. benchmark</p>
+                {secondaryPortfolio && (
+                    <p className="text-xs text-gray-400 mt-1" style={{ fontSize: '0.7rem' }} title="Returns sourced from Alpha Vantage; may differ slightly from Morningstar due to data source and month-end conventions.">
+                        Secondary portfolio: Alpha Vantage total return (may differ from Morningstar).
+                    </p>
+                )}
             </div>
             {/* Lighter border, no shadow for cleaner look */}
             <div className="overflow-hidden rounded-lg border border-gray-200">
