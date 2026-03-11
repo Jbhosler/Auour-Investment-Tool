@@ -2,11 +2,29 @@
 import { MonthlyReturn, Drawdown, PerformanceMetrics, Strategy, DistributionAnalysis } from '../types';
 import { runMonteCarloSimulation } from './monteCarloSimulator';
 
-const calculateAnnualizedReturn = (returns: MonthlyReturn[], years: number): number | null => {
+/**
+ * Trailing annualized return (CAGR) for the last N full calendar months.
+ * Uses point-to-point compounding: product of (1 + r) over the period, then annualized.
+ * When asOfEndMonth is provided, uses only returns through that month (e.g. quarter end for fact-sheet alignment).
+ * @param returns - Chronological monthly returns (oldest first)
+ * @param years - 1, 3, 5, or 10
+ * @param asOfEndMonth - Optional 'YYYY-MM'; if set, trailing period ends on this month (inclusive)
+ */
+const calculateAnnualizedReturn = (
+    returns: MonthlyReturn[],
+    years: number,
+    asOfEndMonth?: string
+): number | null => {
     const months = years * 12;
-    if (returns.length < months) return null;
+    let subset = returns;
+    if (asOfEndMonth) {
+        const idx = returns.findIndex((r) => r.date === asOfEndMonth);
+        if (idx < 0) return null;
+        subset = returns.slice(0, idx + 1);
+    }
+    if (subset.length < months) return null;
 
-    const relevantReturns = returns.slice(-months);
+    const relevantReturns = subset.slice(-months);
     const product = relevantReturns.reduce((acc, r) => acc * (1 + r.value), 1);
     return Math.pow(product, 12 / months) - 1;
 };
@@ -87,7 +105,7 @@ const calculateDrawdowns = (returns: MonthlyReturn[]): Drawdown[] => {
 };
 
 
-const calculateRollingReturns = (returns: MonthlyReturn[], windowMonths: number): number[] => {
+export const calculateRollingReturns = (returns: MonthlyReturn[], windowMonths: number): number[] => {
     if (returns.length < windowMonths) return [];
     const rolling: number[] = [];
     for (let i = 0; i <= returns.length - windowMonths; i++) {
@@ -100,10 +118,11 @@ const calculateRollingReturns = (returns: MonthlyReturn[], windowMonths: number)
 
 const analyzeRollingReturns = (rollingReturns: number[]) => {
     if (rollingReturns.length === 0) return { percentPositive: 0, percentNegative: 0, distribution: [] };
-    const positiveCount = rollingReturns.filter(r => r > 0).length;
+    const positiveCount = rollingReturns.filter(r => r >= 0).length;
+    const negativeCount = rollingReturns.filter(r => r < 0).length;
     
     const percentPositive = (positiveCount / rollingReturns.length) * 100;
-    const percentNegative = 100 - percentPositive;
+    const percentNegative = (negativeCount / rollingReturns.length) * 100;
     
     const min = Math.floor(Math.min(...rollingReturns) * 10) / 10;
     const max = Math.ceil(Math.max(...rollingReturns) * 10) / 10;
@@ -123,6 +142,71 @@ const analyzeRollingReturns = (rollingReturns: number[]) => {
       .sort((a,b) => parseFloat(a.name) - parseFloat(b.name));
 
     return { percentPositive, percentNegative, distribution };
+};
+
+/**
+ * Computes rolling returns distribution using a unified bin scheme across all series.
+ * Fixes mismatched bins when comparing portfolios with very different return ranges
+ * (e.g. equity portfolio vs money market).
+ */
+export const computeUnifiedRollingDistribution = (
+    portfolioRolling: number[],
+    benchmarkRolling: number[],
+    secondaryRolling?: number[]
+): {
+    portfolio: { name: string; value: number }[];
+    benchmark: { name: string; value: number }[];
+    secondary: { name: string; value: number }[];
+} => {
+    const allReturns = [...portfolioRolling, ...benchmarkRolling, ...(secondaryRolling ?? [])];
+    if (allReturns.length === 0) {
+        return {
+            portfolio: [],
+            benchmark: [],
+            secondary: secondaryRolling ? [] : [],
+        };
+    }
+    const min = Math.floor(Math.min(...allReturns) * 10) / 10;
+    const max = Math.ceil(Math.max(...allReturns) * 10) / 10;
+    const range = max - min;
+    const binSize = Math.max(0.01, range / 10);
+
+    const binCounts = (rolling: number[]) => {
+        const bins: { [key: string]: number } = {};
+        for (const r of rolling) {
+            const binStart = Math.floor(r / binSize) * binSize;
+            const binName = `${(binStart * 100).toFixed(0)}% to ${((binStart + binSize) * 100).toFixed(0)}%`;
+            bins[binName] = (bins[binName] || 0) + 1;
+        }
+        return Object.entries(bins)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => parseFloat(a.name) - parseFloat(b.name));
+    };
+
+    const portfolioBins = binCounts(portfolioRolling);
+    const benchmarkBins = binCounts(benchmarkRolling);
+    const secondaryBins = secondaryRolling ? binCounts(secondaryRolling) : [];
+
+    const allKeys = new Set([
+        ...portfolioBins.map((d) => d.name),
+        ...benchmarkBins.map((d) => d.name),
+        ...secondaryBins.map((d) => d.name),
+    ]);
+    const sortedKeys = Array.from(allKeys).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+    const fillMissingBins = (bins: { name: string; value: number }[]) => {
+        const map = new Map(bins.map((d) => [d.name, d.value]));
+        return sortedKeys.map((key) => ({
+            name: key,
+            value: map.get(key) ?? 0,
+        }));
+    };
+
+    return {
+        portfolio: fillMissingBins(portfolioBins),
+        benchmark: fillMissingBins(benchmarkBins),
+        secondary: secondaryRolling ? fillMissingBins(secondaryBins) : [],
+    };
 };
 
 const calculateGrowthOfDollar = (returns: MonthlyReturn[]): { date: string; value: number }[] => {
@@ -260,25 +344,42 @@ export const blendPortfolios = (
     return blendedReturns;
 };
 
+/**
+ * Returns the latest year-end month (December) in the series, e.g. '2025-12'.
+ * Used so all 1/3/5/10 calculations end with the most recent year-end.
+ */
+export const getLatestYearEndMonth = (returns: MonthlyReturn[]): string | undefined => {
+    for (let i = returns.length - 1; i >= 0; i--) {
+        if (returns[i].date.slice(5, 7) === '12') return returns[i].date.slice(0, 7);
+    }
+    return undefined;
+};
+
 export const calculateMetrics = (
     returns: MonthlyReturn[],
     investmentAmount = 0,
     annualDistribution = 0,
-    clientAge = 0
+    clientAge = 0,
+    asOfEndMonth?: string
 ): PerformanceMetrics => {
-    const rolling12m = calculateRollingReturns(returns, 12);
-    const rollingAnalysis = analyzeRollingReturns(rolling12m);
-
+    const series = asOfEndMonth
+        ? returns.filter((r) => r.date <= asOfEndMonth)
+        : returns;
     const monthlyDistribution = annualDistribution / 12;
     const useIRR = investmentAmount > 0 && monthlyDistribution > 0;
-    
-    const returnsMetrics = {
-        '1 Year': useIRR ? calculateIRRForPeriod(returns, 1, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(returns, 1),
-        '3 Year': useIRR ? calculateIRRForPeriod(returns, 3, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(returns, 3),
-        '5 Year': useIRR ? calculateIRRForPeriod(returns, 5, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(returns, 5),
-        '10 Year': useIRR ? calculateIRRForPeriod(returns, 10, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(returns, 10),
-    };
 
+    // When asOfEndMonth is set (e.g. for secondary portfolio), 1/3/5/10 use series through that month; rest use full returns
+    const returnsMetrics = series.length > 0
+        ? {
+            '1 Year': useIRR ? calculateIRRForPeriod(series, 1, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(series, 1),
+            '3 Year': useIRR ? calculateIRRForPeriod(series, 3, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(series, 3),
+            '5 Year': useIRR ? calculateIRRForPeriod(series, 5, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(series, 5),
+            '10 Year': useIRR ? calculateIRRForPeriod(series, 10, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(series, 10),
+        }
+        : { '1 Year': null as number | null, '3 Year': null, '5 Year': null, '10 Year': null };
+
+    const rolling12m = calculateRollingReturns(returns, 12);
+    const rollingAnalysis = analyzeRollingReturns(rolling12m);
     let distributionAnalysis: DistributionAnalysis | undefined = undefined;
     const tenYearReturn = returnsMetrics['10 Year'];
     const volatility = calculateAnnualizedVolatility(returns);

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation, Account, SecondaryPortfolioTicker } from './types';
-import { blendPortfolios, calculateMetrics } from './services/performanceCalculator';
+import { blendPortfolios, calculateMetrics, getLatestYearEndMonth, calculateRollingReturns, computeUnifiedRollingDistribution } from './services/performanceCalculator';
 import { apiService } from './services/apiService';
 import { useApiState, useSettingsState } from './hooks/useApiState';
 import StrategySelector from './components/StrategySelector';
@@ -13,6 +13,7 @@ import AllocationCharts from './components/AllocationCharts';
 import ProposalDetailsForm from './components/ProposalDetailsForm';
 import AccountSelector from './components/AccountSelector';
 import HouseholdSummary from './components/HouseholdSummary';
+import StrategiesOverview from './components/StrategiesOverview';
 
 /** Returns true if the two ticker arrays have the same tickers and weights (order-sensitive). */
 function secondaryTickersMatch(a: SecondaryPortfolioTicker[] | undefined, b: SecondaryPortfolioTicker[] | undefined): boolean {
@@ -23,6 +24,7 @@ function secondaryTickersMatch(a: SecondaryPortfolioTicker[] | undefined, b: Sec
 const App: React.FC = () => {
     const [isAdminMode, setIsAdminMode] = useState(false);
     const [isHouseholdMode, setIsHouseholdMode] = useState(false);
+    const [isStrategiesOverview, setIsStrategiesOverview] = useState(false);
     const [householdView, setHouseholdView] = useState<'account' | 'summary'>('account');
     
     // Use API state instead of localStorage
@@ -447,11 +449,13 @@ const App: React.FC = () => {
         const investmentAmountNum = parseFloat(currentAccount.investmentAmount) || 0;
         const annualDistributionNum = parseFloat(currentAccount.annualDistribution) || 0;
         const clientAgeNum = parseFloat(currentAccount.clientAge) || 0;
-        const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
-        const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
+        const asOfYearEnd = getLatestYearEndMonth(portfolioReturns);
+        const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd);
+        const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd);
 
         // Fetch secondary portfolio returns if enabled (reuse cached returns when tickers and date range unchanged)
         let secondaryPortfolioMetrics: (PerformanceMetrics & { name: string }) | undefined;
+        let secondaryReturns: MonthlyReturn[] | undefined;
         if (currentAccount.enableSecondaryPortfolio && currentAccount.secondaryPortfolioTickers && currentAccount.secondaryPortfolioTickers.length > 0) {
             if (portfolioReturns.length === 0) {
                 alert("Portfolio returns are empty.");
@@ -466,9 +470,9 @@ const App: React.FC = () => {
                 && cachedReturns[0].date <= startDate && cachedReturns[cachedReturns.length - 1].date >= endDate;
 
             if (canUseCache) {
-                const secondaryReturns = cachedReturns.filter(r => r.date >= startDate && r.date <= endDate);
+                secondaryReturns = cachedReturns.filter(r => r.date >= startDate && r.date <= endDate);
                 secondaryPortfolioMetrics = {
-                    ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum),
+                    ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd),
                     name: 'Secondary Portfolio'
                 };
             } else {
@@ -477,9 +481,9 @@ const App: React.FC = () => {
                         currentAccount.secondaryPortfolioTickers,
                         { startDate, endDate }
                     );
-                    const secondaryReturns: MonthlyReturn[] = secondaryResponse.returns;
+                    secondaryReturns = secondaryResponse.returns;
                     secondaryPortfolioMetrics = {
-                        ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum),
+                        ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd),
                         name: 'Secondary Portfolio'
                     };
                     updateAccount(currentAccount.id, {
@@ -499,17 +503,23 @@ const App: React.FC = () => {
             }
         }
 
-        const report: ReportData = {
-            portfolio: {
-                ...portfolioMetrics,
-                name: 'Portfolio'
-            },
-            benchmark: {
-                ...benchmarkMetrics,
-                name: benchmarkName
-            },
-            ...(secondaryPortfolioMetrics && { secondaryPortfolio: secondaryPortfolioMetrics })
-        };
+        let report: ReportData;
+        if (secondaryPortfolioMetrics && secondaryReturns) {
+            const portfolioRolling = calculateRollingReturns(portfolioReturns, 12);
+            const benchmarkRolling = calculateRollingReturns(benchmarkReturns, 12);
+            const secondaryRolling = calculateRollingReturns(secondaryReturns, 12);
+            const unified = computeUnifiedRollingDistribution(portfolioRolling, benchmarkRolling, secondaryRolling);
+            report = {
+                portfolio: { ...portfolioMetrics, name: 'Portfolio', rollingReturnsDistribution: unified.portfolio },
+                benchmark: { ...benchmarkMetrics, name: benchmarkName, rollingReturnsDistribution: unified.benchmark },
+                secondaryPortfolio: { ...secondaryPortfolioMetrics, rollingReturnsDistribution: unified.secondary }
+            };
+        } else {
+            report = {
+                portfolio: { ...portfolioMetrics, name: 'Portfolio' },
+                benchmark: { ...benchmarkMetrics, name: benchmarkName },
+            };
+        }
 
         updateAccount(currentAccount.id, { reportData: report });
 
@@ -762,8 +772,21 @@ const App: React.FC = () => {
                         <p className="text-gray-600 mt-1">Create compelling, data-driven investment proposals for your clients.</p>
                     </div>
                      <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => { setIsStrategiesOverview(false); }}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${!isStrategiesOverview ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                        >
+                            Proposal
+                        </button>
+                        <button
+                            onClick={() => { setIsStrategiesOverview(true); }}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium ${isStrategiesOverview ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                        >
+                            Strategies Overview
+                        </button>
                         {!isAdminMode && (
                             <>
+                                <span className="text-gray-400">|</span>
                                 <span className="text-sm font-medium text-gray-700">Household View</span>
                                 <label htmlFor="household-toggle" className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" id="household-toggle" className="sr-only peer" checked={isHouseholdMode} onChange={() => setIsHouseholdMode(!isHouseholdMode)} />
@@ -771,6 +794,7 @@ const App: React.FC = () => {
                                 </label>
                             </>
                         )}
+                        <span className="text-gray-400">|</span>
                         <span className="text-sm font-medium text-gray-700">{isAdminMode ? 'Admin Mode' : 'Adviser View'}</span>
                         <label htmlFor="admin-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="admin-toggle" className="sr-only peer" checked={isAdminMode} onChange={() => setIsAdminMode(!isAdminMode)} />
@@ -781,7 +805,9 @@ const App: React.FC = () => {
             </header>
 
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-                {isAdminMode ? (
+                {isStrategiesOverview ? (
+                    <StrategiesOverview />
+                ) : isAdminMode ? (
                      <AdminPanel
                         strategies={strategies}
                         benchmarks={benchmarks}

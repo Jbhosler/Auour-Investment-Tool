@@ -422,6 +422,27 @@ app.post('/api/secondary-portfolio', express.json(), async (req, res) => {
   }
 });
 
+// ============ STRATEGIES OVERVIEW ROUTE ============
+
+// Fetch strategy characteristics from Alpha Vantage (dividend yield, P/E, beta, etc.)
+app.post('/api/strategies-overview', express.json(), async (req, res) => {
+  try {
+    const { strategies } = req.body;
+
+    if (!strategies || !Array.isArray(strategies) || strategies.length === 0) {
+      return res.status(400).json({ error: 'strategies array is required' });
+    }
+
+    const { fetchStrategiesOverview } = await import('./strategiesOverviewService.js');
+    const results = await fetchStrategiesOverview(strategies);
+    res.json({ strategies: results });
+  } catch (error) {
+    const message = error?.message || 'Failed to fetch strategies overview';
+    console.error('Strategies overview error:', message, error?.stack || '');
+    res.status(500).json({ error: message });
+  }
+});
+
 // ============ DIAGNOSTIC LOGGING ROUTE ============
 
 // Log diagnostic information from frontend

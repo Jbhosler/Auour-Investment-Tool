@@ -48,7 +48,7 @@ export const fetchSecondaryPortfolioReturns = async (tickers, weights, primaryRe
   }
 
   // Alpha Vantage rate limit: avoid "Burst pattern detected" by spacing requests (ms between each ticker)
-  const delayMs = Math.max(1000, parseInt(process.env.ALPHAVANTAGE_DELAY_MS || '2000', 10));
+  const delayMs = Math.max(0, parseInt(process.env.ALPHAVANTAGE_DELAY_MS || '0', 10));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const fetchOneTicker = async (tickerObj) => {
@@ -135,25 +135,14 @@ export const fetchSecondaryPortfolioReturns = async (tickers, weights, primaryRe
     });
 
     // Monthly total return: (adjusted_close_curr / adjusted_close_prev) - 1.
-    // Source-specific rule for funds where AV's recent data may not fully reflect dividends:
-    // - For the last 12 months of the series, always add the current month's dividend when present
-    //   so 1-year trailing return matches official sources.
-    // - For older months, add dividend only when adjusted close equals raw close (no double-count),
-    //   so 3/5/10 year returns stay correct.
-    const RECENT_MONTHS_ADD_DIVIDEND = 12;
+    // Alpha Vantage adjusted close is adjusted for splits and dividends; that ratio is the
+    // standard total return. We do not add the reported dividend when adj equals close, so that
+    // trailing returns align with Morningstar (which uses the same convention for funds).
     const returns = [];
     for (let i = 1; i < monthlyData.length; i++) {
       const prev = monthlyData[i - 1];
       const curr = monthlyData[i];
-      const prevPrice = prev.adjustedClose;
-      let currValue = curr.adjustedClose;
-      const div = curr.dividendAmount || 0;
-      const isRecentMonth = (monthlyData.length - 1 - i) < RECENT_MONTHS_ADD_DIVIDEND;
-      const adjustedEqualsClose = Math.abs(curr.adjustedClose - curr.close) < 1e-6;
-      if (div > 0 && (isRecentMonth || adjustedEqualsClose)) {
-        currValue = curr.adjustedClose + div;
-      }
-      const monthlyReturn = (currValue - prevPrice) / prevPrice;
+      const monthlyReturn = (curr.adjustedClose - prev.adjustedClose) / prev.adjustedClose;
       const date = curr.date.slice(0, 7);
       returns.push({ date, value: monthlyReturn });
     }
