@@ -13,6 +13,7 @@ import GrowthChart from './GrowthChart';
 import DistributionAnalysis from './DistributionAnalysis';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { apiService } from '../services/apiService';
+import { calculatePlatformFeeFromWaterfall } from '../services/performanceCalculator';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@^4.4.168/build/pdf.worker.min.mjs';
 
@@ -29,6 +30,9 @@ interface ReportOutputProps {
     clientAge: string;
     annualDistribution: string;
     riskTolerance: string;
+    adviserFee?: string;
+    platformFee?: string;
+    platformFeeManualOverride?: boolean;
     strategyAllocationData?: { name: string; value: number }[];
     categoryAllocationData?: { name: string; value: number }[];
     benchmarkAllocationData?: { name: string; value: number }[];
@@ -155,6 +159,59 @@ const ClientVariables: React.FC<{
 };
 
 
+// Portfolio fees summary for report - Auour Fee, Platform Fee, Adviser Fee, Total
+const PortfolioFeesTable: React.FC<{
+    investmentAmount: string;
+    adviserFee: string;
+    platformFee: string;
+    platformFeeManualOverride: boolean;
+}> = ({ investmentAmount, adviserFee, platformFee, platformFeeManualOverride }) => {
+    const AUOUR_FEE_BPS = 32; // 32 bps, built into uploaded returns
+    const auourFeePercent = AUOUR_FEE_BPS / 100; // 0.32%
+
+    const accountValue = parseFloat(investmentAmount.replace(/[^0-9.-]/g, '')) || 0;
+    const platformFeePercent = platformFeeManualOverride
+        ? (parseFloat(platformFee) || 0)
+        : calculatePlatformFeeFromWaterfall(accountValue);
+    const adviserFeePercent = parseFloat(adviserFee) || 0;
+
+    const totalFeePercent = auourFeePercent + platformFeePercent + adviserFeePercent;
+
+    const rows = [
+        { label: 'Auour Fee', value: auourFeePercent, note: '(built into returns)' },
+        { label: 'Platform Fee', value: platformFeePercent },
+        { label: 'Adviser Fee', value: adviserFeePercent },
+        { label: 'Total', value: totalFeePercent, isTotal: true },
+    ];
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="mb-2 pb-1 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Fees Applied to Portfolio</h3>
+            </div>
+            <table className="min-w-full text-left text-xs" style={{ fontSize: '0.75rem' }}>
+                <thead>
+                    <tr className="border-b border-gray-200">
+                        <th className="py-1.5 pr-4 font-medium text-gray-600">Fee</th>
+                        <th className="py-1.5 font-medium text-gray-600 text-right">Annual %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row, i) => (
+                        <tr key={i} className={row.isTotal ? 'border-t-2 border-gray-300 font-semibold' : 'border-b border-gray-100'}>
+                            <td className="py-1 pr-4 text-gray-700">
+                                {row.label}
+                                {row.note && <span className="text-gray-500 font-normal ml-1">{row.note}</span>}
+                            </td>
+                            <td className="py-1 text-gray-700 text-right">{row.value.toFixed(2)}%</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 const ReportOutput: React.FC<ReportOutputProps> = ({ 
     reportData, 
     selectedBeforePageIds, 
@@ -168,6 +225,9 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
     clientAge,
     annualDistribution,
     riskTolerance,
+    adviserFee = '',
+    platformFee = '',
+    platformFeeManualOverride = false,
     strategyAllocationData = [],
     categoryAllocationData = [],
     benchmarkAllocationData = [],
@@ -978,6 +1038,13 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                         <AllocationPieCharts />
                         {/* 3. AI Summary - Third */}
                         {aiSummary && <SummaryForPdf summary={aiSummary} />}
+                        {/* 4. Portfolio Fees - After Executive Summary */}
+                        <PortfolioFeesTable
+                            investmentAmount={investmentAmount}
+                            adviserFee={adviserFee}
+                            platformFee={platformFee}
+                            platformFeeManualOverride={platformFeeManualOverride}
+                        />
                     </div>
                 );
             };

@@ -294,6 +294,41 @@ const calculateIRRForPeriod = (
 };
 
 
+/** Platform fee waterfall tiers: [maxAccountValue, feeRate]. Fee rate as decimal (e.g. 0.004 = 0.4%). */
+export const PLATFORM_FEE_TIERS: { maxValue: number; rate: number }[] = [
+    { maxValue: 250_000, rate: 0.004 },
+    { maxValue: 500_000, rate: 0.0037 },
+    { maxValue: 750_000, rate: 0.0032 },
+    { maxValue: 1_500_000, rate: 0.0027 },
+    { maxValue: 3_500_000, rate: 0.0022 },
+    { maxValue: 10_000_000, rate: 0.002 },
+    { maxValue: 25_000_000, rate: 0.0015 },
+    { maxValue: Infinity, rate: 0.001 },
+];
+
+/**
+ * Calculates annual platform fee (as percentage of account value) using waterfall tiers.
+ * Each tier applies only to the amount within that tier's range.
+ * @param accountValue - Account value in dollars
+ * @returns Effective annual fee as percentage (e.g. 0.385 for 0.385%)
+ */
+export const calculatePlatformFeeFromWaterfall = (accountValue: number): number => {
+    if (accountValue <= 0) return 0;
+    let totalFee = 0;
+    let prevMax = 0;
+    for (const tier of PLATFORM_FEE_TIERS) {
+        const tierStart = prevMax;
+        const tierEnd = Math.min(tier.maxValue, accountValue);
+        if (tierEnd > tierStart) {
+            const tierAmount = tierEnd - tierStart;
+            totalFee += tierAmount * tier.rate;
+        }
+        if (accountValue <= tier.maxValue) break;
+        prevMax = tier.maxValue;
+    }
+    return (totalFee / accountValue) * 100;
+};
+
 /**
  * Adjusts monthly returns by deducting an annual adviser fee on a pro-rata basis.
  * If annual fee is 1%, each monthly return is reduced by (1/12)% = 0.0833%
@@ -317,7 +352,8 @@ export const adjustReturnsByFee = (returns: MonthlyReturn[], annualFeePercent: n
 
 export const blendPortfolios = (
     weightedStrategies: (Strategy & { weight: number })[], 
-    annualFeePercent?: number
+    annualFeePercent?: number,
+    platformFeePercent?: number
 ): MonthlyReturn[] => {
     if (weightedStrategies.length === 0) return [];
     
@@ -336,9 +372,10 @@ export const blendPortfolios = (
         br.value = totalReturnValue;
     });
 
-    // Apply fee adjustment if provided
-    if (annualFeePercent && annualFeePercent > 0) {
-        return adjustReturnsByFee(blendedReturns, annualFeePercent);
+    // Apply fee adjustments (adviser + platform). Fees are additive.
+    const totalFeePercent = (annualFeePercent || 0) + (platformFeePercent || 0);
+    if (totalFeePercent > 0) {
+        return adjustReturnsByFee(blendedReturns, totalFeePercent);
     }
 
     return blendedReturns;

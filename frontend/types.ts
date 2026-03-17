@@ -86,6 +86,8 @@ export interface Account {
     annualDistribution: string;
     riskTolerance: string;
     adviserFee: string;
+    platformFee?: string;
+    platformFeeManualOverride?: boolean;
     enableSecondaryPortfolio?: boolean;
     secondaryPortfolioTickers?: SecondaryPortfolioTicker[];
     secondaryPortfolioReturns?: MonthlyReturn[];

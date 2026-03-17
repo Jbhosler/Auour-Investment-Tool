@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { calculatePlatformFeeFromWaterfall } from '../services/performanceCalculator';
 
 interface SecondaryPortfolioTicker {
     ticker: string;
@@ -20,6 +21,10 @@ interface ProposalDetailsFormProps {
     setRiskTolerance: (tolerance: string) => void;
     adviserFee: string;
     setAdviserFee: (fee: string) => void;
+    platformFee: string;
+    setPlatformFee: (fee: string) => void;
+    platformFeeManualOverride: boolean;
+    setPlatformFeeManualOverride: (override: boolean) => void;
     enableSecondaryPortfolio?: boolean;
     setEnableSecondaryPortfolio?: (enabled: boolean) => void;
     secondaryPortfolioTickers?: SecondaryPortfolioTicker[];
@@ -41,6 +46,10 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
     setRiskTolerance,
     adviserFee,
     setAdviserFee,
+    platformFee,
+    setPlatformFee,
+    platformFeeManualOverride = false,
+    setPlatformFeeManualOverride,
     enableSecondaryPortfolio = false,
     setEnableSecondaryPortfolio,
     secondaryPortfolioTickers = [],
@@ -223,6 +232,64 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
                         Annual fee deducted monthly on a pro-rata basis (e.g., 1% = 0.083% per month)
+                    </p>
+                </div>
+
+                {/* Platform Fee */}
+                <div>
+                    <div className="flex items-center justify-between mb-1">
+                        <label htmlFor="platform-fee" className="block text-sm font-medium text-gray-700">
+                            Platform Annual Fee (%)
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <span className="text-xs text-gray-500">Manual override</span>
+                            <input
+                                type="checkbox"
+                                checked={platformFeeManualOverride}
+                                onChange={(e) => setPlatformFeeManualOverride(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                        </label>
+                    </div>
+                    {platformFeeManualOverride ? (
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                            <input
+                                type="text"
+                                id="platform-fee"
+                                value={platformFee}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    const sanitizedValue = value.replace(/[^0-9.]/g, '');
+                                    const parts = sanitizedValue.split('.');
+                                    if (parts.length > 2) {
+                                        setPlatformFee(parts[0] + '.' + parts.slice(1).join(''));
+                                    } else if (parts[1] && parts[1].length > 2) {
+                                        setPlatformFee(parts[0] + '.' + parts[1].substring(0, 2));
+                                    } else {
+                                        setPlatformFee(sanitizedValue);
+                                    }
+                                }}
+                                className="block w-full border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="0.40"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span className="text-gray-500 sm:text-sm">%</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="mt-1 flex items-center rounded-md border border-gray-300 bg-gray-50 px-3 py-2 sm:text-sm">
+                            <span className="text-gray-700 font-medium">
+                                {(() => {
+                                    const amt = parseFloat(investmentAmount.replace(/[^0-9.-]/g, '')) || 0;
+                                    const calculated = calculatePlatformFeeFromWaterfall(amt);
+                                    return calculated > 0 ? `${calculated.toFixed(2)}%` : '—';
+                                })()}
+                            </span>
+                            <span className="ml-2 text-xs text-gray-500">(waterfall schedule)</span>
+                        </div>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                        Waterfall fee by account value. Deducted monthly on a pro-rata basis.
                     </p>
                 </div>
                 

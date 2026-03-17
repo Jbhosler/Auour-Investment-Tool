@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation, Account, SecondaryPortfolioTicker } from './types';
-import { blendPortfolios, calculateMetrics, getLatestYearEndMonth, calculateRollingReturns, computeUnifiedRollingDistribution } from './services/performanceCalculator';
+import { blendPortfolios, calculateMetrics, getLatestYearEndMonth, calculateRollingReturns, computeUnifiedRollingDistribution, calculatePlatformFeeFromWaterfall } from './services/performanceCalculator';
 import { apiService } from './services/apiService';
 import { useApiState, useSettingsState } from './hooks/useApiState';
 import StrategySelector from './components/StrategySelector';
@@ -66,6 +66,8 @@ const App: React.FC = () => {
                 annualDistribution: '',
                 riskTolerance: '',
                 adviserFee: '',
+                platformFee: '',
+                platformFeeManualOverride: false,
                 enableSecondaryPortfolio: false,
                 secondaryPortfolioTickers: []
             };
@@ -227,10 +229,14 @@ const App: React.FC = () => {
             };
         }).filter((s): s is NonNullable<typeof s> => s !== null);
 
-        // Get adviser fee for calculations
+        // Get adviser fee and platform fee for calculations
         const adviserFeeNum = parseFloat(currentAccount.adviserFee) || 0;
+        const investmentAmountNum = parseFloat(currentAccount.investmentAmount.replace(/[^0-9.-]/g, '')) || 0;
+        const platformFeeNum = currentAccount.platformFeeManualOverride
+            ? (parseFloat(currentAccount.platformFee) || 0)
+            : calculatePlatformFeeFromWaterfall(investmentAmountNum);
         
-        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum);
+        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum, platformFeeNum);
         const portfolioMetrics = calculateMetrics(portfolioReturns);
         const portfolioVolatility = portfolioMetrics.volatility;
 
@@ -258,7 +264,7 @@ const App: React.FC = () => {
         }
         
         lastProcessedState.current = stateKey;
-    }, [currentAccount?.id, currentAccount?.portfolioAllocations, currentAccount?.selectedBenchmarkId, currentAccount?.adviserFee, totalAllocation, strategies, benchmarks, benchmarkMetricsMap, updateAccount]);
+    }, [currentAccount?.id, currentAccount?.portfolioAllocations, currentAccount?.selectedBenchmarkId, currentAccount?.adviserFee, currentAccount?.platformFee, currentAccount?.platformFeeManualOverride, currentAccount?.investmentAmount, totalAllocation, strategies, benchmarks, benchmarkMetricsMap, updateAccount]);
     
     // Track last benchmark validation to prevent loops
     const lastBenchmarkValidation = useRef<{
@@ -441,12 +447,15 @@ const App: React.FC = () => {
             benchmarkName = benchmark.name;
         }
 
-        // Parse adviser fee (annual percentage)
+        // Parse adviser fee and platform fee (annual percentage)
         const adviserFeeNum = parseFloat(currentAccount.adviserFee) || 0;
+        const investmentAmountNum = parseFloat(currentAccount.investmentAmount.replace(/[^0-9.-]/g, '')) || 0;
+        const platformFeeNum = currentAccount.platformFeeManualOverride
+            ? (parseFloat(currentAccount.platformFee) || 0)
+            : calculatePlatformFeeFromWaterfall(investmentAmountNum);
         
-        // Apply adviser fee to portfolio returns (but not benchmark - benchmarks are already net of their fees)
-        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum);
-        const investmentAmountNum = parseFloat(currentAccount.investmentAmount) || 0;
+        // Apply adviser and platform fees to portfolio returns (but not benchmark - benchmarks are already net of their fees)
+        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum, platformFeeNum);
         const annualDistributionNum = parseFloat(currentAccount.annualDistribution) || 0;
         const clientAgeNum = parseFloat(currentAccount.clientAge) || 0;
         const asOfYearEnd = getLatestYearEndMonth(portfolioReturns);
@@ -887,6 +896,10 @@ const App: React.FC = () => {
                                                     setRiskTolerance={(val) => updateAccount(currentAccount.id, { riskTolerance: val })}
                                                     adviserFee={currentAccount.adviserFee}
                                                     setAdviserFee={(val) => updateAccount(currentAccount.id, { adviserFee: val })}
+                                                    platformFee={currentAccount.platformFee ?? ''}
+                                                    setPlatformFee={(val) => updateAccount(currentAccount.id, { platformFee: val })}
+                                                    platformFeeManualOverride={currentAccount.platformFeeManualOverride ?? false}
+                                                    setPlatformFeeManualOverride={(override) => updateAccount(currentAccount.id, { platformFeeManualOverride: override })}
                                                     enableSecondaryPortfolio={currentAccount.enableSecondaryPortfolio || false}
                                                     setEnableSecondaryPortfolio={(enabled) => updateAccount(currentAccount.id, { enableSecondaryPortfolio: enabled })}
                                                     secondaryPortfolioTickers={currentAccount.secondaryPortfolioTickers || []}
@@ -968,6 +981,9 @@ const App: React.FC = () => {
                                                   clientAge={currentAccount.clientAge}
                                                   annualDistribution={currentAccount.annualDistribution}
                                                   riskTolerance={currentAccount.riskTolerance}
+                                                  adviserFee={currentAccount.adviserFee}
+                                                  platformFee={currentAccount.platformFee ?? ''}
+                                                  platformFeeManualOverride={currentAccount.platformFeeManualOverride ?? false}
                                                   strategyAllocationData={strategyAllocationData}
                                                   categoryAllocationData={categoryAllocationData}
                                                   benchmarkAllocationData={benchmarkAllocationData}
@@ -1005,6 +1021,10 @@ const App: React.FC = () => {
                                     setRiskTolerance={(val) => currentAccount && updateAccount(currentAccount.id, { riskTolerance: val })}
                                     adviserFee={currentAccount?.adviserFee || ''}
                                     setAdviserFee={(val) => currentAccount && updateAccount(currentAccount.id, { adviserFee: val })}
+                                    platformFee={currentAccount?.platformFee ?? ''}
+                                    setPlatformFee={(val) => currentAccount && updateAccount(currentAccount.id, { platformFee: val })}
+                                    platformFeeManualOverride={currentAccount?.platformFeeManualOverride ?? false}
+                                    setPlatformFeeManualOverride={(override) => currentAccount && updateAccount(currentAccount.id, { platformFeeManualOverride: override })}
                                     enableSecondaryPortfolio={currentAccount?.enableSecondaryPortfolio || false}
                                     setEnableSecondaryPortfolio={(enabled) => currentAccount && updateAccount(currentAccount.id, { enableSecondaryPortfolio: enabled })}
                                     secondaryPortfolioTickers={currentAccount?.secondaryPortfolioTickers || []}
@@ -1080,6 +1100,9 @@ const App: React.FC = () => {
                                           clientAge={currentAccount.clientAge}
                                           annualDistribution={currentAccount.annualDistribution}
                                           riskTolerance={currentAccount.riskTolerance}
+                                          adviserFee={currentAccount?.adviserFee ?? ''}
+                                          platformFee={currentAccount?.platformFee ?? ''}
+                                          platformFeeManualOverride={currentAccount?.platformFeeManualOverride ?? false}
                                           strategyAllocationData={strategyAllocationData}
                                           categoryAllocationData={categoryAllocationData}
                                           benchmarkAllocationData={benchmarkAllocationData}
