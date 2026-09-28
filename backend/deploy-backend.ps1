@@ -54,8 +54,9 @@ $deployCmd = "gcloud run deploy $SERVICE_NAME " +
     "--platform managed " +
     "--region $REGION " +
     "--allow-unauthenticated " +
+    "--timeout 900 " +
     "--set-env-vars `"NODE_ENV=production`" " +
-    "--memory 512Mi " +
+    "--memory 1Gi " +
     "--cpu 1 " +
     "--min-instances 0 " +
     "--max-instances 10"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Strategy, Benchmark, MonthlyReturn, AssetAllocation, SecondaryPortfolioTicker } from '../types';
-import { parseReturnsCSV } from '../utils/csvParser';
+import { appendMonthlyReturns, parseReturnsCSV } from '../utils/csvParser';
 import { apiService } from '../services/apiService';
 import { CloseIcon } from './icons/Icons';
 
@@ -18,12 +18,13 @@ function getDefaultReturnsDateRange(): { startDate: string; endDate: string } {
 interface AddEditModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: { name: string; assetAllocation?: AssetAllocation; returns?: MonthlyReturn[] | null; }) => void;
+    onSave: (data: { name: string; assetAllocation?: AssetAllocation; returns?: MonthlyReturn[] | null; linkedPdfData?: string | null; }) => void;
     itemToEdit: Strategy | Benchmark | null;
     type: 'Strategy' | 'Benchmark';
 }
 
 type StrategyInputMode = 'csv' | 'tickers';
+type ReturnsEditMode = 'none' | 'replace' | 'append';
 
 const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, itemToEdit, type }) => {
     const [name, setName] = useState('');
@@ -36,6 +37,10 @@ const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, it
     const [strategyInputMode, setStrategyInputMode] = useState<StrategyInputMode>('csv');
     const [tickers, setTickers] = useState<SecondaryPortfolioTicker[]>([]);
     const [isFetchingTickers, setIsFetchingTickers] = useState(false);
+    const [linkedPdfFile, setLinkedPdfFile] = useState<File | null>(null);
+    const [clearLinkedPdf, setClearLinkedPdf] = useState(false);
+    const [returnsEditMode, setReturnsEditMode] = useState<ReturnsEditMode>('none');
+    const [returnsCsvFile, setReturnsCsvFile] = useState<File | null>(null);
 
     const isEditMode = !!itemToEdit;
     const totalAllocation = equity + fixedIncome + alternatives;
@@ -62,6 +67,10 @@ const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, it
             }
         }
         setFile(null);
+        setLinkedPdfFile(null);
+        setClearLinkedPdf(false);
+        setReturnsEditMode('none');
+        setReturnsCsvFile(null);
         setError('');
     }, [itemToEdit, isOpen, type, showTickerOption]);
 
@@ -96,7 +105,7 @@ const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, it
             return;
         }
 
-        const dataToSave: { name: string; assetAllocation?: AssetAllocation; returns?: MonthlyReturn[] | null; } = { name: trimmedName };
+        const dataToSave: { name: string; assetAllocation?: AssetAllocation; returns?: MonthlyReturn[] | null; linkedPdfData?: string | null; } = { name: trimmedName };
         
         if (type === 'Strategy') {
              if (totalAllocation !== 100) {
@@ -107,6 +116,44 @@ const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, it
         }
 
         if (isEditMode) {
+            if (type === 'Strategy') {
+                if (clearLinkedPdf) {
+                    dataToSave.linkedPdfData = null;
+                } else if (linkedPdfFile) {
+                    const base64 = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(linkedPdfFile);
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = (e) => reject(e);
+                    });
+                    dataToSave.linkedPdfData = base64;
+                } else {
+                    dataToSave.linkedPdfData = (itemToEdit as Strategy)?.linkedPdfData ?? null;
+                }
+            }
+
+            if ((type === 'Strategy' || type === 'Benchmark') && returnsEditMode !== 'none') {
+                if (!returnsCsvFile) {
+                    setError('Select a CSV file to update monthly returns, or choose "Do not change returns".');
+                    return;
+                }
+                setIsParsing(true);
+                try {
+                    const parsed = await parseReturnsCSV(returnsCsvFile, trimmedName);
+                    const existing =
+                        type === 'Strategy'
+                            ? (itemToEdit as Strategy).returns ?? []
+                            : (itemToEdit as Benchmark).returns ?? [];
+                    dataToSave.returns =
+                        returnsEditMode === 'replace' ? parsed : appendMonthlyReturns(existing, parsed);
+                } catch (err: any) {
+                    setError(err.message || 'Failed to parse returns CSV.');
+                    setIsParsing(false);
+                    return;
+                }
+                setIsParsing(false);
+            }
+
             onSave(dataToSave);
         } else {
             if (showTickerOption && strategyInputMode === 'tickers') {
@@ -204,6 +251,94 @@ const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, it
                             </div>
                         </div>
                     )}
+
+                    {isEditMode && (type === 'Strategy' || type === 'Benchmark') && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Monthly returns</label>
+                            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md space-y-3">
+                                <div className="space-y-2">
+                                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="returnsEditMode"
+                                            checked={returnsEditMode === 'none'}
+                                            onChange={() => { setReturnsEditMode('none'); setReturnsCsvFile(null); }}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm">Do not change returns</span>
+                                    </label>
+                                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="returnsEditMode"
+                                            checked={returnsEditMode === 'replace'}
+                                            onChange={() => setReturnsEditMode('replace')}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm">Replace all returns from CSV</span>
+                                    </label>
+                                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="returnsEditMode"
+                                            checked={returnsEditMode === 'append'}
+                                            onChange={() => setReturnsEditMode('append')}
+                                            className="text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm">Append new months from CSV (skip months that already exist)</span>
+                                    </label>
+                                </div>
+                                {returnsEditMode !== 'none' && (
+                                    <div>
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            onChange={(e) => setReturnsCsvFile(e.target.files?.[0] || null)}
+                                            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Same format as when adding a {type === 'Strategy' ? 'strategy' : 'benchmark'}: column{' '}
+                                            <code className="text-xs bg-gray-200 px-0.5 rounded">date</code> (mm/01/yyyy) and a column
+                                            named to match this {type === 'Strategy' ? 'strategy' : 'benchmark'} (case-insensitive).
+                                            Decimal returns (e.g. 0.021 for 2.1%).
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {type === 'Strategy' && isEditMode && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Linked PDF (appended to proposal when this strategy is used)</label>
+                            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2">
+                                {(itemToEdit as Strategy)?.linkedPdfData ? (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-gray-600">PDF currently linked</span>
+                                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={clearLinkedPdf}
+                                                onChange={(e) => setClearLinkedPdf(e.target.checked)}
+                                                className="text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm">Remove PDF</span>
+                                        </label>
+                                    </div>
+                                ) : null}
+                                {!clearLinkedPdf && (
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={(e) => setLinkedPdfFile(e.target.files?.[0] || null)}
+                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    />
+                                )}
+                                {linkedPdfFile && <p className="text-xs text-gray-500">{linkedPdfFile.name}</p>}
+                                <p className="text-xs text-gray-500">Optional. If set, this PDF will be appended to the end of the proposal when this strategy is used.</p>
+                            </div>
+                        </div>
+                    )}
                     
                     {!isEditMode && (
                         <>
@@ -244,7 +379,15 @@ const AddEditModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSave, it
                                         className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                         accept=".csv"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">CSV must have 'date' (mm/01/yyyy) and a column header that matches this item's name. Returns should be in decimal format (e.g., 0.021 for 2.1%).</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        CSV must have &apos;date&apos; (mm/01/yyyy) and a column header that matches this item&apos;s name. Returns should be in decimal format (e.g., 0.021 for 2.1%).
+                                        {(type === 'Strategy' || type === 'Benchmark') && (
+                                            <>
+                                                {' '}
+                                                Use <strong>gross</strong> monthly returns (no fee deductions in the file). For the portfolio, strategist, platform, and adviser fees are applied only to the <strong>net</strong> blended series; gross columns and benchmarks use uploads as-is.
+                                            </>
+                                        )}
+                                    </p>
                                 </div>
                             )}
                             {showTickerOption && strategyInputMode === 'tickers' && (

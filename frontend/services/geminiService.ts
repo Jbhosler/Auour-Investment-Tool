@@ -1,5 +1,6 @@
 import { ReportData } from '../types';
 import { diagnosticLogger } from '../utils/diagnosticLogger';
+import { formatPerformanceAsOfLabel } from '../utils/performanceAsOfDisplay';
 // Use static import - Vite will handle bundling and code-splitting automatically
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -237,6 +238,7 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
         });
         
         let model;
+        let successfulModel: string | null = null;
         try {
             // Add explicit check right before the call
             if (!genAI || typeof genAI.getGenerativeModel !== 'function') {
@@ -270,6 +272,18 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
             const CACHE_KEY_WORKING_MODEL = 'gemini_working_model';
             const CACHE_KEY_AVAILABLE_MODELS = 'gemini_available_models';
             const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+            // Models Google has retired from generateContent (404 "no longer available")
+            const RETIRED_MODEL_PREFIXES = [
+                'gemini-1.0',
+                'gemini-1.5',
+                'gemini-2.0',
+                'gemini-2.5',
+                'gemini-pro',
+            ];
+            const isRetiredModel = (name: string) =>
+                RETIRED_MODEL_PREFIXES.some(
+                    (prefix) => name === prefix || name.startsWith(`${prefix}-`) || name.startsWith(`${prefix}.`)
+                ) || name === 'gemini-pro';
             
             let cachedWorkingModel: string | null = null;
             let availableModels: string[] = [];
@@ -279,10 +293,14 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
                 if (cachedModelData) {
                     const parsed = JSON.parse(cachedModelData);
                     const age = Date.now() - parsed.timestamp;
-                    if (age < CACHE_EXPIRY_MS) {
+                    if (age < CACHE_EXPIRY_MS && parsed.model && !isRetiredModel(parsed.model)) {
                         cachedWorkingModel = parsed.model;
                         console.error(`✅ Using cached working model: ${cachedWorkingModel}`);
                         diagnosticLogger.info('Using cached working model', { model: cachedWorkingModel });
+                    } else if (parsed.model && isRetiredModel(parsed.model)) {
+                        console.error(`⚠️ Cached model ${parsed.model} is retired - clearing cache`);
+                        localStorage.removeItem(CACHE_KEY_WORKING_MODEL);
+                        localStorage.removeItem(CACHE_KEY_AVAILABLE_MODELS);
                     }
                 }
                 
@@ -291,7 +309,9 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
                     const parsed = JSON.parse(cachedModelsData);
                     const age = Date.now() - parsed.timestamp;
                     if (age < CACHE_EXPIRY_MS) {
-                        availableModels = parsed.models || [];
+                        availableModels = (parsed.models || []).filter(
+                            (name: string) => name && !isRetiredModel(name)
+                        );
                         console.error(`✅ Using cached available models (${availableModels.length} models)`);
                     }
                 }
@@ -317,7 +337,12 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
                                 const name = m.name || m.displayName || String(m);
                                 return name.replace(/^models\//, '');
                             })
-                            .filter((name: string) => name && name.toLowerCase().includes('gemini'));
+                            .filter(
+                                (name: string) =>
+                                    name &&
+                                    name.toLowerCase().includes('gemini') &&
+                                    !isRetiredModel(name)
+                            );
                         
                         // Cache the available models
                         try {
@@ -338,26 +363,19 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
                 console.error('✅ Using cached model data - skipping API discovery calls');
             }
             
-            // Call using stored reference
-            // Try multiple model names - start with most stable/universal models first
-            // The error suggests v1beta API doesn't support newer models - try older ones first
-            // If we got available models from listModels, try those first
+            // Prefer current GA Flash models; fall back to other non-retired discovered models
             const defaultModelsToTry = [
-                'gemini-pro',            // Original stable model (most likely to work with any API key)
-                'gemini-1.5-pro',        // Older but stable
-                'gemini-1.5-flash',      // Flash version
-                'gemini-2.0-flash-exp',  // Latest experimental
-                'gemini-2.5-flash',      // Latest stable flash
-                'gemini-2.5-pro'         // Latest stable pro
+                'gemini-3.5-flash',
+                'gemini-3.1-flash-lite',
+                'gemini-3-flash-preview',
             ];
             
-            // If we got available models, prioritize those
-            const modelNamesToTry = availableModels.length > 0 
-                ? [...availableModels, ...defaultModelsToTry.filter(m => !availableModels.includes(m))]
-                : defaultModelsToTry;
+            const modelNamesToTry = [
+                ...defaultModelsToTry,
+                ...availableModels.filter((m) => !defaultModelsToTry.includes(m)),
+            ];
             
             let lastError: any = null;
-            let successfulModel: string | null = null;
             
             // If we have a cached working model, use it directly (skip discovery)
             if (cachedWorkingModel) {
@@ -484,6 +502,12 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
 
         const returnLabel = reportData.portfolio.returnType === 'IRR' ? 'IRR' : 'Return';
         const annualizedReturnLabel = `Annualized ${returnLabel}`;
+        const metricsAsOfLabel = formatPerformanceAsOfLabel(
+            reportData.portfolio.performanceAsOf ?? reportData.benchmark.performanceAsOf
+        );
+        const metricsAsOfBlock = metricsAsOfLabel
+            ? `**Performance as of:** ${metricsAsOfLabel} (last month in the blended portfolio and benchmark return series).\n\n`
+            : '';
 
         const prompt = `
     You are an experienced fiduciary financial adviser at Auour Investments writing an executive summary for an investment proposal.
@@ -521,7 +545,7 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
 
     ${clientContext}
 
-    **Proposed Portfolio: ${reportData.portfolio.name}**
+    ${metricsAsOfBlock}**Proposed Portfolio: ${reportData.portfolio.name}**
     - 1-Year ${returnLabel}: ${formatPercent(reportData.portfolio.returns['1 Year'])}
     - 3-Year ${annualizedReturnLabel}: ${formatPercent(reportData.portfolio.returns['3 Year'])}
     - 5-Year ${annualizedReturnLabel}: ${formatPercent(reportData.portfolio.returns['5 Year'])}
@@ -548,11 +572,74 @@ export const generateProposalSummary = async (reportData: ReportData, clientAge:
     Generate the executive summary following the requirements and focus areas above. Start directly with the analysis content - no greetings or introductory sentences.
         `;
 
-        try {
-            const result = await model.generateContent(prompt);
+        const isModelUnavailableError = (error: any) => {
+            const message = error?.error?.message || error?.message || '';
+            const code = error?.error?.code || error?.status;
+            return (
+                code === 404 ||
+                /no longer available|not found|is not found for API version/i.test(message)
+            );
+        };
+
+        const generateWithModel = async (activeModel: any) => {
+            const result = await activeModel.generateContent(prompt);
             const response = await result.response;
             return response.text();
+        };
+
+        try {
+            return await generateWithModel(model);
         } catch (error: any) {
+            // getGenerativeModel succeeds for retired IDs; failure only appears at generateContent
+            if (isModelUnavailableError(error) && genAI && typeof genAI.getGenerativeModel === 'function') {
+                diagnosticLogger.info('Model unavailable at generateContent; retrying with current models', {
+                    failedModel: successfulModel,
+                    errorMessage: error?.message,
+                });
+                try {
+                    localStorage.removeItem('gemini_working_model');
+                    localStorage.removeItem('gemini_available_models');
+                } catch {
+                    // Ignore storage errors
+                }
+
+                const fallbackModels = [
+                    'gemini-3.5-flash',
+                    'gemini-3.1-flash-lite',
+                    'gemini-3-flash-preview',
+                ].filter((name) => name !== successfulModel);
+
+                let lastFallbackError: any = error;
+                for (const fallbackName of fallbackModels) {
+                    try {
+                        console.error(`🔵 Retrying generateContent with ${fallbackName}`);
+                        const fallbackModel = genAI.getGenerativeModel({ model: fallbackName });
+                        const text = await generateWithModel(fallbackModel);
+                        try {
+                            localStorage.setItem(
+                                'gemini_working_model',
+                                JSON.stringify({ model: fallbackName, timestamp: Date.now() })
+                            );
+                        } catch {
+                            // Ignore storage errors
+                        }
+                        diagnosticLogger.info('Fallback model succeeded', { model: fallbackName });
+                        return text;
+                    } catch (fallbackError: any) {
+                        lastFallbackError = fallbackError;
+                        diagnosticLogger.info('Fallback model failed', {
+                            model: fallbackName,
+                            errorMessage: fallbackError?.message,
+                        });
+                        if (!isModelUnavailableError(fallbackError)) {
+                            error = fallbackError;
+                            break;
+                        }
+                    }
+                }
+                error = lastFallbackError;
+            }
+
             diagnosticLogger.error("Error generating summary", {
                 errorMessage: error?.message,
                 errorStack: error?.stack,

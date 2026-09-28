@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { PerformanceMetrics } from '../types';
+import { formatPerformanceAsOfLabel } from '../utils/performanceAsOfDisplay';
 
 interface GrowthChartProps {
     portfolio: PerformanceMetrics & { name: string };
@@ -31,6 +32,7 @@ const currencyFormatterRound = (value: number) => {
 const GrowthChart: React.FC<GrowthChartProps> = ({ portfolio, benchmark, isPdfMode = false, investmentAmount = '1', showTitle = true, secondaryPortfolio }) => {
 
     const initialInvestment = parseFloat(investmentAmount.replace(/[^0-9.-]+/g, "")) || 1;
+    const asOfLabel = formatPerformanceAsOfLabel(portfolio.performanceAsOf ?? benchmark.performanceAsOf);
 
     const mergedData = useMemo(() => {
         const portfolioMap = new Map(portfolio.growthOfDollar.map(d => [d.date, d.value * initialInvestment]));
@@ -76,7 +78,12 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ portfolio, benchmark, isPdfMo
     return (
         <div className="bg-white px-0 py-0 rounded-lg">
             {showTitle && (
-                <h4 className="font-semibold text-base text-[#003365] mb-0 px-2 pt-1" style={{ fontSize: '0.95rem' }}>Growth of {currencyFormatter(initialInvestment)}</h4>
+                <div>
+                    <h4 className="font-semibold text-base text-[#003365] mb-0 px-2 pt-1" style={{ fontSize: '0.95rem' }}>Growth of {currencyFormatter(initialInvestment)}</h4>
+                    {asOfLabel && (
+                        <p className="text-[#4b5563] px-2 font-medium" style={{ fontSize: '0.7rem' }}>As of {asOfLabel}</p>
+                    )}
+                </div>
             )}
             {/* Reduced margins and padding to maximize chart size */}
             <div style={{ width: isPdfMode ? '700px' : '100%', height: isPdfMode ? 400 : 400 }}>

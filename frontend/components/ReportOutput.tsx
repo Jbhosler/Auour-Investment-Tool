@@ -13,7 +13,8 @@ import GrowthChart from './GrowthChart';
 import DistributionAnalysis from './DistributionAnalysis';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { apiService } from '../services/apiService';
-import { calculatePlatformFeeFromWaterfall } from '../services/performanceCalculator';
+import { calculatePlatformFeeFromWaterfall, STRATEGIST_FEE_ANNUAL_PERCENT } from '../services/performanceCalculator';
+import { buildUldProposalPayload, isFullUldScenario } from '../services/uldProposalPayload';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@^4.4.168/build/pdf.worker.min.mjs';
 
@@ -21,6 +22,8 @@ interface ReportOutputProps {
     reportData: ReportData;
     selectedBeforePageIds: string[];
     selectedAfterPageIds: string[];
+    portfolioAllocations?: { strategyId: string; weight: number }[];
+    strategies?: { id: string; name?: string; linkedPdfData?: string | null; templateKey?: string | null }[];
     aiSummary: string;
     firmLogo: string | null;
     secondaryLogo: string | null;
@@ -42,17 +45,17 @@ interface ReportOutputProps {
 // Component to display captured chart image in PDF
 const CapturedChartImage: React.FC<{ imageDataUrl: string; title: string; showTitle?: boolean }> = ({ imageDataUrl, title, showTitle = false }) => {
     if (!imageDataUrl) {
-        return <div className="p-4 text-gray-500" style={{ fontSize: '0.875rem' }}>Chart not available</div>;
+        return <div className="p-4 text-[#4b5563]" style={{ fontSize: '0.875rem' }}>Chart not available</div>;
     }
     return (
-        <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
+        <div className="bg-white px-0 py-0">
             {showTitle && (
-                <div className="mb-3 pb-2 border-b border-gray-200">
-                    <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '1rem' }}>{title}</h4>
+                <div className="mb-2 pb-1.5 border-b border-[#f3f4f6]">
+                    <h4 className="font-semibold text-[#003365] tracking-tight" style={{ fontSize: '0.95rem' }}>{title}</h4>
                 </div>
             )}
             <div className="flex justify-center">
-                <img src={imageDataUrl} alt={title} className="max-w-full h-auto" style={{ maxHeight: '400px' }} />
+                <img src={imageDataUrl} alt={title} className="max-w-full h-auto" style={{ maxHeight: '350px' }} />
             </div>
         </div>
     );
@@ -62,26 +65,25 @@ const SummaryForPdf: React.FC<{ summary: string }> = ({ summary }) => {
     const paragraphs = summary.split('\n').filter(p => p.trim() !== '');
     
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <div className="mb-2 pb-1 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Executive Summary</h3>
+        <div className="bg-white p-2.5">
+            <div className="mb-1.5 pb-1 border-b border-[#f3f4f6]">
+                <h3 className="text-sm font-semibold text-[#003365] tracking-tight" style={{ fontSize: '0.8rem' }}>Executive Summary</h3>
             </div>
-            <div className="prose max-w-none text-gray-600 space-y-2" style={{ fontSize: '0.75rem', lineHeight: '1.5' }}>
+            <div className="prose max-w-none text-[#4b5563] space-y-2" style={{ fontSize: '0.75rem', lineHeight: '1.5' }}>
                 {paragraphs.map((paragraph, index) => {
-                    // Check if paragraph is a heading (starts with ** and ends with **)
                     const isHeading = paragraph.trim().startsWith('**') && paragraph.trim().endsWith('**');
                     const cleanParagraph = paragraph.replace(/\*\*/g, '').trim();
                     
                     if (isHeading) {
                         return (
-                            <h4 key={index} className="font-semibold text-[#003365] mt-2 mb-1 pb-0.5 border-b border-gray-200" style={{ fontSize: '0.8rem' }}>
+                            <h4 key={index} className="font-semibold text-[#003365] tracking-tight mt-2 mb-1 pb-0.5 border-b border-[#f3f4f6]" style={{ fontSize: '0.8rem' }}>
                                 {cleanParagraph}
                             </h4>
                         );
                     }
                     
                     return (
-                        <p key={index} className="leading-relaxed text-gray-600 break-words" style={{ fontSize: '0.75rem', lineHeight: '1.5' }}>
+                        <p key={index} className="leading-relaxed text-[#4b5563] break-words" style={{ fontSize: '0.75rem', lineHeight: '1.5' }}>
                             {paragraph}
                         </p>
                     );
@@ -112,45 +114,45 @@ const ClientVariables: React.FC<{
     };
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <div className="mb-2 pb-1 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Client Information</h3>
+        <div className="bg-white p-2.5">
+            <div className="mb-1.5 pb-1 border-b border-[#f3f4f6]">
+                <h3 className="text-sm font-semibold text-[#003365] tracking-tight" style={{ fontSize: '0.8rem' }}>Client Information</h3>
             </div>
             <div className="grid grid-cols-3 gap-3">
                 {clientName && (
                     <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Client Name</p>
-                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{clientName}</p>
+                        <p className="text-xs text-[#4b5563] uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Client Name</p>
+                        <p className="text-xs font-medium text-[#4b5563]" style={{ fontSize: '0.75rem' }}>{clientName}</p>
                     </div>
                 )}
                 {clientAge && (
                     <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Age</p>
-                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{clientAge} years</p>
+                        <p className="text-xs text-[#4b5563] uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Age</p>
+                        <p className="text-xs font-medium text-[#4b5563]" style={{ fontSize: '0.75rem' }}>{clientAge} years</p>
                     </div>
                 )}
                 {investmentAmount && (
                     <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Investment Amount</p>
-                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{formatCurrency(investmentAmount)}</p>
+                        <p className="text-xs text-[#4b5563] uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Investment Amount</p>
+                        <p className="text-xs font-medium text-[#4b5563]" style={{ fontSize: '0.75rem' }}>{formatCurrency(investmentAmount)}</p>
                     </div>
                 )}
                 {annualDistribution && (
                     <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Annual Distribution</p>
-                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{formatCurrency(annualDistribution)}</p>
+                        <p className="text-xs text-[#4b5563] uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Annual Distribution</p>
+                        <p className="text-xs font-medium text-[#4b5563]" style={{ fontSize: '0.75rem' }}>{formatCurrency(annualDistribution)}</p>
                     </div>
                 )}
                 {riskTolerance && (
                     <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Risk Tolerance</p>
-                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{riskTolerance}</p>
+                        <p className="text-xs text-[#4b5563] uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Risk Tolerance</p>
+                        <p className="text-xs font-medium text-[#4b5563]" style={{ fontSize: '0.75rem' }}>{riskTolerance}</p>
                     </div>
                 )}
                 {adviserName && (
                     <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Adviser</p>
-                        <p className="text-xs font-medium text-gray-700" style={{ fontSize: '0.75rem' }}>{adviserName}</p>
+                        <p className="text-xs text-[#4b5563] uppercase tracking-wide mb-0.5" style={{ fontSize: '0.65rem' }}>Adviser</p>
+                        <p className="text-xs font-medium text-[#4b5563]" style={{ fontSize: '0.75rem' }}>{adviserName}</p>
                     </div>
                 )}
             </div>
@@ -159,15 +161,14 @@ const ClientVariables: React.FC<{
 };
 
 
-// Portfolio fees summary for report - Auour Fee, Platform Fee, Adviser Fee, Total
+// Portfolio fees summary for report - strategist (Auour) fee, platform fee, adviser fee, total
 const PortfolioFeesTable: React.FC<{
     investmentAmount: string;
     adviserFee: string;
     platformFee: string;
     platformFeeManualOverride: boolean;
 }> = ({ investmentAmount, adviserFee, platformFee, platformFeeManualOverride }) => {
-    const AUOUR_FEE_BPS = 32; // 32 bps, built into uploaded returns
-    const auourFeePercent = AUOUR_FEE_BPS / 100; // 0.32%
+    const strategistFeePercent = STRATEGIST_FEE_ANNUAL_PERCENT;
 
     const accountValue = parseFloat(investmentAmount.replace(/[^0-9.-]/g, '')) || 0;
     const platformFeePercent = platformFeeManualOverride
@@ -175,35 +176,52 @@ const PortfolioFeesTable: React.FC<{
         : calculatePlatformFeeFromWaterfall(accountValue);
     const adviserFeePercent = parseFloat(adviserFee) || 0;
 
-    const totalFeePercent = auourFeePercent + platformFeePercent + adviserFeePercent;
+    const totalFeePercent = strategistFeePercent + platformFeePercent + adviserFeePercent;
 
-    const rows = [
-        { label: 'Auour Fee', value: auourFeePercent, note: '(built into returns)' },
+    const rows: { label: string; value: number; note?: string; isTotal?: boolean }[] = [
+        { label: 'Auour Fee', value: strategistFeePercent },
         { label: 'Platform Fee', value: platformFeePercent },
         { label: 'Adviser Fee', value: adviserFeePercent },
         { label: 'Total', value: totalFeePercent, isTotal: true },
     ];
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <div className="mb-2 pb-1 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Fees Applied to Portfolio</h3>
+        <div
+            className="bg-white p-3"
+            style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+        >
+            <div className="mb-1.5 pb-1 border-b border-[#f3f4f6]">
+                <h3 className="text-sm font-semibold text-[#003365] tracking-tight" style={{ fontSize: '0.8rem' }}>Fees Applied to Portfolio</h3>
+                <p className="text-[#4b5563] mt-0.5" style={{ fontSize: '0.65rem', lineHeight: 1.35 }}>
+                    Uploaded returns are shown gross. Net portfolio performance subtracts the total annual fee below (applied evenly across each month&apos;s return).
+                </p>
             </div>
-            <table className="min-w-full text-left text-xs" style={{ fontSize: '0.75rem' }}>
+            <table
+                className="w-full text-left"
+                style={{
+                    fontSize: '0.75rem',
+                    tableLayout: 'fixed',
+                    width: '100%',
+                }}
+            >
+                <colgroup>
+                    <col style={{ width: '65%' }} />
+                    <col style={{ width: '35%' }} />
+                </colgroup>
                 <thead>
-                    <tr className="border-b border-gray-200">
-                        <th className="py-1.5 pr-4 font-medium text-gray-600">Fee</th>
-                        <th className="py-1.5 font-medium text-gray-600 text-right">Annual %</th>
+                    <tr className="border-b border-[#f3f4f6]">
+                        <th className="py-1 pr-2 font-medium text-[#4b5563]" style={{ whiteSpace: 'nowrap' }}>Fee</th>
+                        <th className="py-1 font-medium text-[#4b5563] text-right">Annual %</th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map((row, i) => (
-                        <tr key={i} className={row.isTotal ? 'border-t-2 border-gray-300 font-semibold' : 'border-b border-gray-100'}>
-                            <td className="py-1 pr-4 text-gray-700">
+                        <tr key={i} className={row.isTotal ? 'border-t border-[#f3f4f6] font-semibold' : 'border-b border-[#f3f4f6]'}>
+                            <td className="py-1 pr-2 text-[#4b5563]" style={{ whiteSpace: 'nowrap', overflow: 'visible' }}>
                                 {row.label}
-                                {row.note && <span className="text-gray-500 font-normal ml-1">{row.note}</span>}
+                                {row.note && <span className="font-normal ml-1 text-[#4b5563]">{row.note}</span>}
                             </td>
-                            <td className="py-1 text-gray-700 text-right">{row.value.toFixed(2)}%</td>
+                            <td className="py-1 text-[#4b5563] text-right" style={{ whiteSpace: 'nowrap' }}>{row.value.toFixed(2)}%</td>
                         </tr>
                     ))}
                 </tbody>
@@ -216,6 +234,8 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
     reportData, 
     selectedBeforePageIds, 
     selectedAfterPageIds, 
+    portfolioAllocations = [],
+    strategies = [],
     aiSummary, 
     firmLogo,
     secondaryLogo,
@@ -237,6 +257,9 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
     // Refs to capture already-rendered charts from screen
     const growthChartRef = useRef<HTMLDivElement>(null);
     const rollingReturnsChartRef = useRef<HTMLDivElement>(null);
+    const uldGrowthChartRef = useRef<HTMLDivElement>(null);
+    const uldHistogramRef = useRef<HTMLDivElement>(null);
+    const fullUld = isFullUldScenario(portfolioAllocations, strategies);
 
     const handleDownloadPdf = async () => {
         if (isGeneratingPdf) return;
@@ -252,7 +275,7 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 // Small delay to ensure chart is fully rendered
                 await new Promise(resolve => setTimeout(resolve, 50));
                 const canvas = await html2canvas(ref.current, {
-                    scale: 1.5, // Reduced from 2 for smaller file size (still good quality)
+                    scale: 2.0, // Balance of print sharpness and file size
                     useCORS: true,
                     logging: false,
                     backgroundColor: '#ffffff'
@@ -265,7 +288,62 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
             }
         };
         
-        // Capture all charts that are already rendered on screen
+        if (fullUld) {
+            try {
+                const captureNode = async (node: HTMLElement | null): Promise<string> => {
+                    if (!node) return '';
+                    const canvas = await html2canvas(node, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                    });
+                    return canvas.toDataURL('image/png');
+                };
+                const visibleChart = (selector: string): HTMLElement | null => {
+                    const nodes = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+                    return nodes.find((el) => el.getClientRects().length > 0) || null;
+                };
+                const [growth, histogram, strategyPie, categoryPie] = await Promise.all([
+                    captureNode(uldGrowthChartRef.current),
+                    captureNode(uldHistogramRef.current),
+                    captureNode(visibleChart('[data-uld-chart="strategy"]')),
+                    captureNode(visibleChart('[data-uld-chart="category"]')),
+                ]);
+                if (!growth || !histogram || !strategyPie || !categoryPie) {
+                    throw new Error('Could not capture the scenario charts');
+                }
+                const payload = buildUldProposalPayload({
+                    reportData,
+                    strategies,
+                    allocations: portfolioAllocations,
+                    clientName,
+                    investmentAmount,
+                    riskTolerance,
+                    adviserFee,
+                    platformFee,
+                    platformFeeManualOverride,
+                    aiSummary,
+                    charts: { growth, histogram },
+                    allocationCharts: { strategy: strategyPie, category: categoryPie },
+                });
+                const blob = await apiService.downloadUldProposal(payload);
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const safeName = (clientName || 'proposal').replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, '_').trim();
+                link.href = url;
+                link.download = `Proposal_${safeName || 'ULD'}_Ultra_Low_Duration.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Failed to generate ULD PDF:', error);
+                alert('An error occurred while generating the Ultra Low Duration proposal. Please check the console.');
+            } finally {
+                setIsGeneratingPdf(false);
+            }
+            return;
+        }
+
         await Promise.all([
             captureChart(growthChartRef, 'growthChart'),
             captureChart(rollingReturnsChartRef, 'rollingReturnsChart')
@@ -276,11 +354,12 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
         renderContainer.style.position = 'absolute';
         renderContainer.style.left = '-9999px';
         renderContainer.style.top = '0';
-        renderContainer.style.width = '210mm';
-        renderContainer.style.height = '297mm';
+        renderContainer.style.width = '8.5in';
+        renderContainer.style.height = '11in';
         renderContainer.style.backgroundColor = 'white';
         renderContainer.style.visibility = 'visible'; // Must be visible for charts to render
         renderContainer.style.display = 'block';
+        renderContainer.style.overflow = 'visible'; // Prevent clipping of table content
         document.body.appendChild(renderContainer);
         
         // Force a layout calculation to ensure container is ready
@@ -290,7 +369,7 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
         const root = createRoot(renderContainer);
 
         try {
-            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdf = new jsPDF('p', 'in', 'letter');
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             let isFirstPage = true;
@@ -441,9 +520,9 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 // One final wait to ensure everything is settled (reduced from 200ms)
                 await new Promise<void>(resolve => setTimeout(resolve, 100));
                 
-                // Capture the canvas with reduced scale for smaller file size
+                // Capture the canvas - scale 2.0 for print sharpness
                 const canvas = await html2canvas(renderContainer, { 
-                    scale: 2, // Reduced from 3 - still excellent quality but much smaller file
+                    scale: 2.0, // Balance of print sharpness and file size
                     useCORS: true,
                     logging: false,
                     onclone: (clonedDoc) => {
@@ -528,12 +607,14 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
             };
             
             // Combined component for Performance Table and Growth Chart on one page
+            // Manual secondary excluded from Growth chart (Performance Table only)
+            const secondaryForGrowthChart = reportData.secondaryPortfolio?.isManualOnly ? undefined : reportData.secondaryPortfolio;
             const CombinedPerformancePage: React.FC = () => {
                 const initialInvestment = parseFloat(investmentAmount.replace(/[^0-9.-]+/g, "")) || 1;
                 const portfolioMap = new Map(reportData.portfolio.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]));
                 const benchmarkMap = new Map(reportData.benchmark.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]));
-                const secondaryMap = reportData.secondaryPortfolio 
-                    ? new Map(reportData.secondaryPortfolio.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]))
+                const secondaryMap = secondaryForGrowthChart 
+                    ? new Map(secondaryForGrowthChart.growthOfDollar.map((d: any) => [d.date, d.value * initialInvestment]))
                     : null;
                 const allDates = new Set([
                     ...portfolioMap.keys(), 
@@ -572,14 +653,13 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                     <div className="space-y-4">
                         <PerformanceTable portfolio={reportData.portfolio} benchmark={reportData.benchmark} returnType={reportData.portfolio.returnType} secondaryPortfolio={reportData.secondaryPortfolio} />
                         {capturedCharts['growthChart'] ? (
-                            <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
-                                {/* Removed redundant title wrapper - chart image already includes title from GrowthChart component */}
+                            <div className="bg-white px-0 py-0">
                                 <div className="flex justify-center">
-                                    <img src={capturedCharts['growthChart']} alt="Growth Chart" className="max-w-full h-auto" style={{ maxHeight: '380px' }} />
+                                    <img src={capturedCharts['growthChart']} alt="Growth Chart" className="max-w-full h-auto" style={{ maxHeight: '350px' }} />
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white px-0 py-0 rounded-lg border border-gray-200">
+                            <div className="bg-white px-0 py-0">
                                 {/* Removed redundant title wrapper - using inline chart without extra title */}
                                 {/* Reduced margins and padding to maximize chart size */}
                                 <div style={{ width: '100%', height: 400 }}>
@@ -631,12 +711,12 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                                                 iconType="line"
                                             />
                                             <Line type="monotone" dataKey="Portfolio" stroke="#003365" dot={false} strokeWidth={2} name={reportData.portfolio.name} />
-                                            {reportData.secondaryPortfolio && (
-                                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={reportData.secondaryPortfolio.name} />
+                                            {secondaryForGrowthChart && (
+                                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={secondaryForGrowthChart.name} />
                                             )}
                                             <Line type="monotone" dataKey="Benchmark" stroke="#9ca3af" dot={false} strokeWidth={2} name={reportData.benchmark.name} />
-                                            {reportData.secondaryPortfolio && (
-                                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={reportData.secondaryPortfolio.name} />
+                                            {secondaryForGrowthChart && (
+                                                <Line type="monotone" dataKey="Secondary Portfolio" stroke="#10b981" dot={false} strokeWidth={2} name={secondaryForGrowthChart.name} />
                                             )}
                                         </LineChart>
                                     </div>
@@ -646,11 +726,13 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 );
             };
 
-            // Combined component for Rolling Returns Chart and Drawdown Table on one page
-            const CombinedReturnsAndDrawdownPage: React.FC = () => {
+            // Combined component for Risk & Distribution: Rolling Returns, Drawdown, Monte Carlo
+            // Manual secondary excluded from these (Performance Table + Growth only)
+            const secondaryForRiskTables = reportData.secondaryPortfolio?.isManualOnly ? undefined : reportData.secondaryPortfolio;
+            const RiskAndDistributionPage: React.FC = () => {
+                const hasMonteCarlo = reportData.portfolio.distributionAnalysis || reportData.benchmark.distributionAnalysis || secondaryForRiskTables?.distributionAnalysis;
                 return (
-                    <div className="space-y-6">
-                        {/* Rolling Returns Chart - first */}
+                    <div className="space-y-4">
                         {capturedCharts['rollingReturnsChart'] ? (
                             <CapturedChartImage 
                                 imageDataUrl={capturedCharts['rollingReturnsChart']} 
@@ -663,17 +745,21 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                                 benchmark={reportData.benchmark} 
                                 isPdfMode={true} 
                                 showTitle={false}
-                                secondaryPortfolio={reportData.secondaryPortfolio}
+                                secondaryPortfolio={secondaryForRiskTables}
                             />
                         )}
-                        {/* Drawdown Table - second */}
-                        <div className="mt-6">
-                            <DrawdownTable 
+                        <DrawdownTable 
+                            portfolio={reportData.portfolio} 
+                            benchmark={reportData.benchmark}
+                            secondaryPortfolio={secondaryForRiskTables}
+                        />
+                        {hasMonteCarlo && (
+                            <DistributionAnalysis 
                                 portfolio={reportData.portfolio} 
-                                benchmark={reportData.benchmark}
-                                secondaryPortfolio={reportData.secondaryPortfolio}
+                                benchmark={reportData.benchmark} 
+                                secondaryPortfolio={secondaryForRiskTables} 
                             />
-                        </div>
+                        )}
                     </div>
                 );
             };
@@ -895,16 +981,15 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
 
                 return (
                     <div className="space-y-4">
-                        {/* Portfolio Allocation */}
-                        <div className="bg-white border border-gray-200 rounded-lg p-3">
-                            <div className="mb-2 pb-1 border-b border-gray-200">
-                                <h3 className="text-sm font-semibold text-[#003365]" style={{ fontSize: '0.85rem' }}>Portfolio Allocation</h3>
+                        <div className="bg-white p-3">
+                            <div className="mb-2 pb-1 border-b border-[#f3f4f6]">
+                                <h3 className="text-sm font-semibold text-[#003365] tracking-tight" style={{ fontSize: '0.85rem' }}>Portfolio Allocation</h3>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 {/* Strategy Allocation Chart */}
                                 {normalizedStrategyData.length > 0 && (
                                     <div>
-                                        <h4 className="text-xs font-medium text-gray-700 mb-2 text-center" style={{ fontSize: '0.75rem' }}>By Strategy</h4>
+                                        <h4 className="text-xs font-medium text-[#4b5563] mb-2 text-center" style={{ fontSize: '0.75rem' }}>By Strategy</h4>
                                         <div style={{ width: '100%', height: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                             <PieChart width={200} height={120}>
                                                 {(() => {
@@ -961,7 +1046,7 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                                 {/* Category Allocation Chart */}
                                 {normalizedCategoryData.length > 0 && (
                                     <div>
-                                        <h4 className="text-xs font-medium text-gray-700 mb-2 text-center" style={{ fontSize: '0.75rem' }}>By Asset Category</h4>
+                                        <h4 className="text-xs font-medium text-[#4b5563] mb-2 text-center" style={{ fontSize: '0.75rem' }}>By Asset Category</h4>
                                         <div style={{ width: '100%', height: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                             <PieChart width={200} height={120}>
                                                 {(() => {
@@ -1022,10 +1107,11 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
             };
 
             // Combined component for Executive Summary and Client Variables
+            // Order: Fees table placed early so it is not cut off when AI summary is long
             const ExecutiveSummaryWithClientInfo: React.FC = () => {
                 return (
-                    <div className="space-y-6">
-                        {/* 1. Client Information - First */}
+                    <div className="space-y-3">
+                        {/* 1. Client Information */}
                         <ClientVariables
                             clientName={clientName}
                             investmentAmount={investmentAmount}
@@ -1034,23 +1120,22 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                             riskTolerance={riskTolerance}
                             adviserName={adviserName}
                         />
-                        {/* 2. Allocation Pie Charts - Second */}
-                        <AllocationPieCharts />
-                        {/* 3. AI Summary - Third */}
-                        {aiSummary && <SummaryForPdf summary={aiSummary} />}
-                        {/* 4. Portfolio Fees - After Executive Summary */}
+                        {/* 2. Portfolio Fees - placed early to avoid cutoff on overflow */}
                         <PortfolioFeesTable
                             investmentAmount={investmentAmount}
                             adviserFee={adviserFee}
                             platformFee={platformFee}
                             platformFeeManualOverride={platformFeeManualOverride}
                         />
+                        {/* 3. Allocation Pie Charts */}
+                        <AllocationPieCharts />
+                        {/* 4. AI Summary - can be long; fees table already above */}
+                        {aiSummary && <SummaryForPdf summary={aiSummary} />}
                     </div>
                 );
             };
 
             const reportPageComponents = [
-                // Always show Executive Summary page (with or without AI summary) to include client variables
                 {
                     title: 'Executive Summary',
                     component: <ExecutiveSummaryWithClientInfo />
@@ -1060,15 +1145,10 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                     component: <CombinedPerformancePage />
                 },
                 {
-                    title: 'Returns & Drawdown Analysis',
-                    component: <CombinedReturnsAndDrawdownPage />
-                },
-                (reportData.portfolio.distributionAnalysis || reportData.benchmark.distributionAnalysis || reportData.secondaryPortfolio?.distributionAnalysis) ? {
-                    title: 'Monte Carlo Simulation Analysis',
-                    component: <DistributionAnalysis portfolio={reportData.portfolio} benchmark={reportData.benchmark} secondaryPortfolio={reportData.secondaryPortfolio} />
-                } : null
-            // FIX: Replaced JSX.Element with React.ReactElement to fix "Cannot find namespace 'JSX'" error.
-            ].filter((p): p is { title: string; component: React.ReactElement; } => p !== null);
+                    title: 'Risk & Distribution',
+                    component: <RiskAndDistributionPage />
+                }
+            ];
 
             // Fetch page data from library for selected pages
             const fetchPageData = async (pageIds: string[]): Promise<string[]> => {
@@ -1125,6 +1205,19 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
             console.log(`Adding ${pagesAfterOutput.length} after output pages`);
             await addPdfPagesToPdf(pagesAfterOutput);
 
+            // 5. Strategy-linked PDFs (appended when strategy is used in proposal)
+            const strategyPdfDataUrls: string[] = [];
+            for (const alloc of portfolioAllocations) {
+                const strategy = strategies.find(s => s.id === alloc.strategyId);
+                if (strategy?.linkedPdfData) {
+                    strategyPdfDataUrls.push(strategy.linkedPdfData);
+                }
+            }
+            if (strategyPdfDataUrls.length > 0) {
+                console.log(`Adding ${strategyPdfDataUrls.length} strategy-linked PDF(s)`);
+                await addPdfPagesToPdf(strategyPdfDataUrls);
+            }
+
             // Generate filename: Proposal_ClientName_AdviserName_short date
             const sanitizeFilename = (str: string): string => {
                 if (!str) return '';
@@ -1165,7 +1258,15 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
         <div className="bg-white p-6 rounded-lg shadow-lg">
                        
              <div className="flex justify-between items-center mb-6 border-b pb-4">
-                <h2 className="text-2xl font-bold text-gray-800">Comparative Performance Analysis</h2>
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Comparative Performance Analysis</h2>
+                    {fullUld && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            Download uses the Ultra Low Duration proposal. Scenario returns, volatility, and drawdowns come from this analysis.
+                            {reportData.secondaryPortfolio ? ' The secondary portfolio comparison remains on this screen.' : ''}
+                        </p>
+                    )}
+                </div>
                 <div className="flex items-center space-x-3">
                     <button
                         onClick={handleDownloadPdf}
@@ -1191,7 +1292,7 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                 </div>
             </div>
             
-            {/* This is the content visible on the screen */}
+            {/* Manual secondary appears only in Performance Table and Growth of Dollar; exclude from Drawdown, Distribution, Rolling Returns */}
             <div className="p-4 space-y-8">
                 <PerformanceTable 
                     portfolio={reportData.portfolio}
@@ -1204,24 +1305,44 @@ const ReportOutput: React.FC<ReportOutputProps> = ({
                         portfolio={reportData.portfolio}
                         benchmark={reportData.benchmark}
                         investmentAmount={investmentAmount}
-                        secondaryPortfolio={reportData.secondaryPortfolio}
+                        secondaryPortfolio={reportData.secondaryPortfolio?.isManualOnly ? undefined : reportData.secondaryPortfolio}
                     />
                 </div>
                 <DistributionAnalysis
                     portfolio={reportData.portfolio}
                     benchmark={reportData.benchmark}
-                    secondaryPortfolio={reportData.secondaryPortfolio}
+                    secondaryPortfolio={reportData.secondaryPortfolio?.isManualOnly ? undefined : reportData.secondaryPortfolio}
                 />
                 <DrawdownTable 
                     portfolio={reportData.portfolio}
                     benchmark={reportData.benchmark}
-                    secondaryPortfolio={reportData.secondaryPortfolio}
+                    secondaryPortfolio={reportData.secondaryPortfolio?.isManualOnly ? undefined : reportData.secondaryPortfolio}
                 />
+                {fullUld && (
+                    <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 0, width: 760, background: '#fff' }}>
+                        <div ref={uldGrowthChartRef} style={{ width: 760, height: 400 }}>
+                            <GrowthChart
+                                portfolio={reportData.portfolio}
+                                benchmark={reportData.benchmark}
+                                investmentAmount={investmentAmount}
+                                showTitle={false}
+                            />
+                        </div>
+                        <div ref={uldHistogramRef} style={{ width: 760, height: 400 }}>
+                            <RollingReturnsChart
+                                portfolio={reportData.portfolio}
+                                benchmark={reportData.benchmark}
+                                showTitle={false}
+                                chartOnly
+                            />
+                        </div>
+                    </div>
+                )}
                 <div ref={rollingReturnsChartRef}>
                     <RollingReturnsChart
                         portfolio={reportData.portfolio}
                         benchmark={reportData.benchmark}
-                        secondaryPortfolio={reportData.secondaryPortfolio}
+                        secondaryPortfolio={reportData.secondaryPortfolio?.isManualOnly ? undefined : reportData.secondaryPortfolio}
                     />
                 </div>
             </div>

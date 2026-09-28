@@ -38,7 +38,10 @@ export default defineConfig(({ mode }) => {
       // Explicitly set the HTML entry point
       outDir: 'dist',
       rollupOptions: {
-        input: path.resolve(__dirname, 'index.html'),
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          fusion: path.resolve(__dirname, 'fusion.html'),
+        },
         output: {
           // Ensure @google/generative-ai is bundled, not externalized
           manualChunks: undefined,

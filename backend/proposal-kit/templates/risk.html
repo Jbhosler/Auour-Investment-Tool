@@ -1,0 +1,34 @@
+{# Generated page - risk & distribution. #}
+{% import "_base.html" as b with context %}
+{% call b.page(page_number, 'Risk &amp; Distribution', 'AS OF ' ~ proposal.as_of|upper, disclosures.discussion) %}
+<div style="margin:6px 0 26px">
+  <div style="display:grid;grid-template-columns:1fr 1px 1fr;gap:26px;align-items:end">
+    <div><div class="lab" style="color:var(--navy);font-weight:700">Portfolio</div>
+      <div class="big" style="font-size:52pt">{{ risk.worst_portfolio.value }}</div>
+      <div class="small">largest peak-to-trough decline &middot; {{ risk.worst_portfolio.dates }}</div></div>
+    <div style="background:var(--c1);height:1.05in"></div>
+    <div><div class="lab">{{ benchmark.name }}</div>
+      <div style="font-size:52pt;color:var(--slate);line-height:1">{{ risk.worst_benchmark.value }}</div>
+      <div class="small">largest peak-to-trough decline &middot; {{ risk.worst_benchmark.dates }}</div></div>
+  </div>
+  {% if risk.note %}
+  <p class="it" style="margin:12px 0 0;border-left:3.5px solid var(--gold);padding-left:12px">{{ risk.note }}</p>
+  {% endif %}
+</div>
+<h2>Largest Drawdowns</h2>
+<div class="small it" style="margin:-4px 0 6px">Historical peak-to-trough declines &middot; As of {{ proposal.as_of }}</div>
+<table><thead><tr><th>Portfolio</th><th>Dates</th><th>{{ benchmark.name }}</th><th>Dates</th></tr></thead><tbody>
+{% for row in risk.drawdownRows %}
+<tr><td class="b">{{ row.portfolio }}</td><td>{{ row.portfolioDates }}</td>
+    <td class="b">{{ row.benchmark }}</td><td>{{ row.benchmarkDates }}</td></tr>
+{% endfor %}
+</tbody></table>
+<h2 style="margin-top:34px">Rolling 12-Month Returns Distribution</h2>
+<div class="small it" style="margin:-4px 0 6px">Frequency analysis of monthly returns &middot; As of {{ proposal.as_of }}</div>
+<table style="margin-bottom:18px"><thead><tr><th></th><th>Positive Periods</th><th>Negative Periods</th></tr></thead><tbody>
+{% for r in risk.distribution %}
+<tr><td>{{ r.name }}</td><td class="b pos">{{ r.positive }}</td><td class="b neg">{{ r.negative }}</td></tr>
+{% endfor %}
+</tbody></table>
+<div class="figbox" style="padding:16px"><img class="fig" src="{{ asset(charts.histogram) }}" style="width:100%"></div>
+{% endcall %}

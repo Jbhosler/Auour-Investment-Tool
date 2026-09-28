@@ -25,6 +25,7 @@ if (USE_SQLITE) {
       name TEXT NOT NULL,
       returns TEXT NOT NULL,
       asset_allocation TEXT NOT NULL,
+      linked_pdf_data TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -78,6 +79,18 @@ if (USE_SQLITE) {
     VALUES (1, '[]', '[]', '[]', '[]');
   `);
   
+  // Migration: add linked_pdf_data to strategies if missing (for existing DBs)
+  try {
+    const info = db.prepare("PRAGMA table_info(strategies)").all();
+    const hasLinkedPdf = info.some(col => col.name === 'linked_pdf_data');
+    if (!hasLinkedPdf) {
+      db.exec('ALTER TABLE strategies ADD COLUMN linked_pdf_data TEXT');
+      console.log('✅ Added linked_pdf_data column to strategies');
+    }
+  } catch (e) {
+    console.warn('Migration linked_pdf_data:', e?.message);
+  }
+  
   initialized = true;
 
 } else {
@@ -117,6 +130,7 @@ if (USE_SQLITE) {
           name TEXT NOT NULL,
           returns JSONB NOT NULL,
           asset_allocation JSONB NOT NULL,
+          linked_pdf_data TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
@@ -212,6 +226,20 @@ if (USE_SQLITE) {
           console.error('❌ CRITICAL: Error adding firm_settings columns:', alterError.message);
           console.error('Error details:', alterError);
           // Don't throw - allow server to start, but log the error
+        }
+
+        // Add linked_pdf_data to strategies if missing
+        try {
+          const stratCols = await db.query(`
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'strategies' AND column_name = 'linked_pdf_data'
+          `);
+          if (stratCols.rows.length === 0) {
+            await db.query('ALTER TABLE strategies ADD COLUMN linked_pdf_data TEXT');
+            console.log('✅ Added linked_pdf_data column to strategies');
+          }
+        } catch (alterError) {
+          console.warn('Migration linked_pdf_data:', alterError?.message);
         }
 
         // Add missing columns to proposals table if they don't exist

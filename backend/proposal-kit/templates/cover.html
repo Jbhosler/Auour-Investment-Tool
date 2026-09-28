@@ -1,0 +1,38 @@
+{# Page 1 - generated. Full-bleed page: no standard chrome. #}
+{% import "_base.html" as b with context %}
+<div class="page" style="padding:0">
+  <div class="field" style="top:0;left:0;width:3.2in;height:1.6in;-webkit-mask-image:linear-gradient(135deg,#000 20%,transparent 75%)"></div>
+  <div class="dots" style="top:.35in;right:.45in;width:1.2in;height:.5in;opacity:.8"></div>
+  <img src="{{ asset('wave.png') }}" style="position:absolute;left:0;bottom:1.25in;width:7.2in;opacity:.95">
+
+  <div style="position:absolute;top:.5in;left:.7in;right:.7in;display:flex;align-items:center;gap:16px">
+    <img src="{{ asset('logo.png') }}" style="height:.5in"><div style="flex:1;height:2px;background:var(--navy)"></div></div>
+  <div style="position:absolute;top:.92in;right:.7in;font-size:8.5pt;color:var(--navy)">{{ firm.tagline }}</div>
+
+  <div style="position:absolute;top:2.55in;left:.7in;display:flex;align-items:stretch;gap:34px">
+    <img src="{{ asset('logo_t.png') }}" style="width:2.9in;align-self:center">
+    <div style="width:4px;background:var(--gold)"></div>
+    <div style="padding:6px 0">
+      <div class="lab g" style="margin-bottom:10px">{{ proposal.date }}</div>
+      <div style="font-size:34pt;color:var(--navy);line-height:1.05">Investment<br>Proposal</div>
+      <div style="width:1.1in;height:2.5px;background:var(--gold);margin:14px 0 12px"></div>
+      <div style="font-size:14pt;color:var(--navy);line-height:1.25">Prepared for {{ client.name }}<br>
+        <span class="it" style="font-size:11.5pt">{{ portfolio.display_name }}</span></div>
+    </div>
+  </div>
+
+  <div style="position:absolute;top:5.55in;left:.7in;right:.7in">
+    <div class="grid3" style="gap:0">
+      {% for c in [['Strategy', portfolio.short_name], ['Investment Amount', proposal.amount], ['Risk Tolerance', proposal.risk_tolerance]] %}
+      <div style="padding:12px 16px;{% if loop.index == 2 %}border:1px solid var(--c1);border-width:1px 1px{% else %}border-top:1px solid var(--c1);border-bottom:1px solid var(--c1){% endif %}">
+        <div class="lab">{{ c[0] }}</div>
+        <div class="num" style="font-size:15pt;font-weight:700">{{ c[1] }}</div></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="ftr" style="left:.7in;right:.7in">
+    <div class="fine" style="font-size:7.2pt">{{ disclosures.cover }}</div>
+    <div class="row"><span class="brand">Auour<b>INVESTMENTS</b></span><span class="mid">{{ firm.footer_line }}</span><span class="pn"></span></div>
+  </div>
+</div>

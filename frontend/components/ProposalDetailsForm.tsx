@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculatePlatformFeeFromWaterfall } from '../services/performanceCalculator';
+import type { SecondaryPortfolioTicker, SecondaryPortfolioManual } from '../types';
 
-interface SecondaryPortfolioTicker {
-    ticker: string;
-    weight: number;
-}
+const EMPTY_SECONDARY_MANUAL: SecondaryPortfolioManual = {
+    name: '',
+    returns1Y: null,
+    returns3Y: null,
+    returns5Y: null,
+    returns10Y: null,
+    volatility: null,
+    returnsAsOf: null,
+};
 
 interface ProposalDetailsFormProps {
     adviserName: string;
@@ -27,8 +33,12 @@ interface ProposalDetailsFormProps {
     setPlatformFeeManualOverride: (override: boolean) => void;
     enableSecondaryPortfolio?: boolean;
     setEnableSecondaryPortfolio?: (enabled: boolean) => void;
+    secondaryPortfolioMode?: 'tickers' | 'manual';
+    setSecondaryPortfolioMode?: (mode: 'tickers' | 'manual') => void;
     secondaryPortfolioTickers?: SecondaryPortfolioTicker[];
     setSecondaryPortfolioTickers?: (tickers: SecondaryPortfolioTicker[]) => void;
+    secondaryPortfolioManual?: SecondaryPortfolioManual;
+    setSecondaryPortfolioManual?: (manual: SecondaryPortfolioManual) => void;
 }
 
 const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
@@ -52,8 +62,12 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
     setPlatformFeeManualOverride,
     enableSecondaryPortfolio = false,
     setEnableSecondaryPortfolio,
+    secondaryPortfolioMode = 'tickers',
+    setSecondaryPortfolioMode,
     secondaryPortfolioTickers = [],
-    setSecondaryPortfolioTickers
+    setSecondaryPortfolioTickers,
+    secondaryPortfolioManual,
+    setSecondaryPortfolioManual
 }) => {
 
     const formatForDisplay = (value: string) => {
@@ -97,7 +111,34 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
     };
 
     const totalWeight = secondaryPortfolioTickers.reduce((sum, t) => sum + (t.weight || 0), 0);
-    const weightError = enableSecondaryPortfolio && secondaryPortfolioTickers.length > 0 && Math.abs(totalWeight - 100) > 0.01;
+    const weightError = enableSecondaryPortfolio && secondaryPortfolioMode === 'tickers' && secondaryPortfolioTickers.length > 0 && Math.abs(totalWeight - 100) > 0.01;
+
+    // Parse percentage string to decimal (e.g. "8.5" -> 0.085)
+    const parsePercentToDecimal = (s: string | undefined): number | null => {
+        if (s == null || s === '') return null;
+        const n = parseFloat(s.replace(/[^0-9.-]/g, ''));
+        return isNaN(n) ? null : n / 100;
+    };
+
+    // Local raw strings for manual inputs - avoids overwriting user input during typing
+    const [rawManualInputs, setRawManualInputs] = useState<Record<string, string>>({});
+    useEffect(() => {
+        if (secondaryPortfolioMode !== 'manual') setRawManualInputs({});
+    }, [secondaryPortfolioMode]);
+    const getManualDisplayValue = (field: string): string => {
+        if (rawManualInputs[field] !== undefined) return rawManualInputs[field];
+        if (field === 'returnsAsOf') return secondaryPortfolioManual?.returnsAsOf ?? '';
+        const val = secondaryPortfolioManual?.[field as keyof SecondaryPortfolioManual];
+        return typeof val === 'number' ? String((val * 100).toFixed(2)) : '';
+    };
+    const handleManualInputChange = (field: string, raw: string) => {
+        setRawManualInputs(prev => ({ ...prev, [field]: raw }));
+        const dec = parsePercentToDecimal(raw);
+        setSecondaryPortfolioManual?.({ ...(secondaryPortfolioManual ?? EMPTY_SECONDARY_MANUAL), [field]: dec });
+    };
+    const handleManualInputBlur = (field: string) => {
+        setRawManualInputs(prev => { const next = { ...prev }; delete next[field]; return next; });
+    };
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -312,76 +353,165 @@ const ProposalDetailsForm: React.FC<ProposalDetailsFormProps> = ({
                             </label>
                         </div>
                         
-                        {enableSecondaryPortfolio && setSecondaryPortfolioTickers && (
+                        {enableSecondaryPortfolio && (
                             <div className="mt-4 space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <p className="text-sm text-gray-600">
-                                        Enter ticker symbols and allocation weights (must total 100%)
-                                    </p>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddTicker}
-                                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        + Add Ticker
-                                    </button>
-                                </div>
-                                
-                                {secondaryPortfolioTickers.length === 0 && (
-                                    <p className="text-sm text-gray-500 italic">Click "Add Ticker" to start building your secondary portfolio.</p>
+                                {setSecondaryPortfolioMode && (
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="secondary-mode"
+                                                checked={secondaryPortfolioMode === 'tickers'}
+                                                onChange={() => setSecondaryPortfolioMode('tickers')}
+                                                className="text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm">Ticker-based (fetch from API)</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="secondary-mode"
+                                                checked={secondaryPortfolioMode === 'manual'}
+                                                onChange={() => setSecondaryPortfolioMode('manual')}
+                                                className="text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm">Manual (enter returns)</span>
+                                        </label>
+                                    </div>
                                 )}
-                                
-                                {secondaryPortfolioTickers.map((ticker, index) => (
-                                    <div key={index} className="flex gap-2 items-start">
-                                        <div className="flex-1">
+                                {secondaryPortfolioMode === 'tickers' && setSecondaryPortfolioTickers && (
+                                    <>
+                                        <div className="flex justify-between items-center">
+                                            <p className="text-sm text-gray-600">
+                                                Enter ticker symbols and allocation weights (must total 100%)
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddTicker}
+                                                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                + Add Ticker
+                                            </button>
+                                        </div>
+                                        {secondaryPortfolioTickers.length === 0 && (
+                                            <p className="text-sm text-gray-500 italic">Click "Add Ticker" to start building your secondary portfolio.</p>
+                                        )}
+                                        {secondaryPortfolioTickers.map((ticker, index) => (
+                                            <div key={index} className="flex gap-2 items-start">
+                                                <div className="flex-1">
+                                                    <input
+                                                        type="text"
+                                                        value={ticker.ticker}
+                                                        onChange={(e) => handleTickerChange(index, 'ticker', e.target.value.toUpperCase())}
+                                                        placeholder="Ticker (e.g., AAPL)"
+                                                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    />
+                                                </div>
+                                                <div className="w-24">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            value={ticker.weight || ''}
+                                                            onChange={(e) => {
+                                                                const val = parseFloat(e.target.value) || 0;
+                                                                handleTickerChange(index, 'weight', val);
+                                                            }}
+                                                            placeholder="Weight %"
+                                                            min="0"
+                                                            max="100"
+                                                            step="0.01"
+                                                            className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-8"
+                                                        />
+                                                        <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                                            <span className="text-gray-500 text-xs">%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveTicker(index)}
+                                                    className="px-2 py-1 text-sm text-red-600 hover:text-red-800 focus:outline-none"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {secondaryPortfolioTickers.length > 0 && (
+                                            <div className="flex justify-between items-center pt-2 border-t">
+                                                <span className={`text-sm font-medium ${weightError ? 'text-red-600' : 'text-gray-700'}`}>
+                                                    Total: {totalWeight.toFixed(2)}%
+                                                </span>
+                                                {weightError && (
+                                                    <span className="text-xs text-red-600">
+                                                        Weights must total exactly 100%
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                {secondaryPortfolioMode === 'manual' && setSecondaryPortfolioManual && (
+                                    <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <p className="text-sm text-gray-600">
+                                            Manual portfolios appear only in the Performance Table. Entered percentages and volatility are used as typed; optionally set an "as of" month below if those figures correspond to a different month-end than the primary portfolio's blended data end.
+                                        </p>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Portfolio Name</label>
                                             <input
                                                 type="text"
-                                                value={ticker.ticker}
-                                                onChange={(e) => handleTickerChange(index, 'ticker', e.target.value.toUpperCase())}
-                                                placeholder="Ticker (e.g., AAPL)"
+                                                value={secondaryPortfolioManual?.name ?? ''}
+                                                onChange={(e) => setSecondaryPortfolioManual({ ...(secondaryPortfolioManual ?? EMPTY_SECONDARY_MANUAL), name: e.target.value })}
+                                                placeholder="e.g., Competitor Fund"
                                                 className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                             />
                                         </div>
-                                        <div className="w-24">
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    value={ticker.weight || ''}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value) || 0;
-                                                        handleTickerChange(index, 'weight', val);
-                                                    }}
-                                                    placeholder="Weight %"
-                                                    min="0"
-                                                    max="100"
-                                                    step="0.01"
-                                                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-8"
-                                                />
-                                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                                                    <span className="text-gray-500 text-xs">%</span>
-                                                </div>
-                                            </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {(['1Y', '3Y', '5Y', '10Y'] as const).map((key) => {
+                                                const field = `returns${key}`;
+                                                const label = key.replace('Y', '-Year Return');
+                                                return (
+                                                    <div key={key}>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">{label} (%)</label>
+                                                        <input
+                                                            type="text"
+                                                            value={getManualDisplayValue(field)}
+                                                            onChange={(e) => handleManualInputChange(field, e.target.value)}
+                                                            onBlur={() => handleManualInputBlur(field)}
+                                                            placeholder="e.g., 8.5"
+                                                            className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveTicker(index)}
-                                            className="px-2 py-1 text-sm text-red-600 hover:text-red-800 focus:outline-none"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
-                                
-                                {secondaryPortfolioTickers.length > 0 && (
-                                    <div className="flex justify-between items-center pt-2 border-t">
-                                        <span className={`text-sm font-medium ${weightError ? 'text-red-600' : 'text-gray-700'}`}>
-                                            Total: {totalWeight.toFixed(2)}%
-                                        </span>
-                                        {weightError && (
-                                            <span className="text-xs text-red-600">
-                                                Weights must total exactly 100%
-                                            </span>
-                                        )}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Annualized Volatility (%)</label>
+                                            <input
+                                                type="text"
+                                                value={getManualDisplayValue('volatility')}
+                                                onChange={(e) => handleManualInputChange('volatility', e.target.value)}
+                                                onBlur={() => handleManualInputBlur('volatility')}
+                                                placeholder="e.g., 12.5"
+                                                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm max-w-[140px]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Returns data as of (optional)</label>
+                                            <input
+                                                type="month"
+                                                value={secondaryPortfolioManual?.returnsAsOf ?? ''}
+                                                onChange={(e) =>
+                                                    setSecondaryPortfolioManual({
+                                                        ...(secondaryPortfolioManual ?? EMPTY_SECONDARY_MANUAL),
+                                                        returnsAsOf: e.target.value.trim() ? e.target.value : null,
+                                                    })
+                                                }
+                                                className="block w-full max-w-[180px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Leave blank to use the primary portfolio's last blended month. Use this when your factsheet is through a later month than the modeled primary series.
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
                             </div>

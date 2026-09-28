@@ -1,6 +1,45 @@
 
-import { MonthlyReturn, Drawdown, PerformanceMetrics, Strategy, DistributionAnalysis } from '../types';
+import { MonthlyReturn, Drawdown, PerformanceMetrics, Strategy, DistributionAnalysis, SecondaryPortfolioManual } from '../types';
 import { runMonteCarloSimulation } from './monteCarloSimulator';
+
+type WeightedMonthlySeries = {
+    weight: number;
+    returns: MonthlyReturn[];
+};
+
+/**
+ * Months that appear on every weighted series, sorted ascending (YYYY-MM chronological order).
+ */
+export const intersectMonthlyDatesAcrossSeries = (
+    weightedStrategies: WeightedMonthlySeries[]
+): string[] => {
+    if (weightedStrategies.length === 0) return [];
+    if (weightedStrategies.some((w) => w.returns.length === 0)) return [];
+    const perStrategySets = weightedStrategies.map((w) => new Set(w.returns.map((r) => r.date)));
+    const firstDates = [...perStrategySets[0]];
+    firstDates.sort();
+    return firstDates.filter((d) => perStrategySets.every((set) => set.has(d)));
+};
+
+/**
+ * Trims series `a` to months where both `a` and `b` exist; returns aligned pairs ordered by `a`.
+ */
+export const intersectTwoMonthlySeries = (
+    a: MonthlyReturn[],
+    b: MonthlyReturn[]
+): [MonthlyReturn[], MonthlyReturn[]] => {
+    const bMap = new Map(b.map((r) => [r.date, r]));
+    const outA: MonthlyReturn[] = [];
+    const outB: MonthlyReturn[] = [];
+    for (const r of a) {
+        const br = bMap.get(r.date);
+        if (br !== undefined) {
+            outA.push(r);
+            outB.push(br);
+        }
+    }
+    return [outA, outB];
+};
 
 /**
  * Trailing annualized return (CAGR) for the last N full calendar months.
@@ -39,65 +78,84 @@ const calculateAnnualizedVolatility = (returns: MonthlyReturn[]): number | null 
 };
 
 /**
- * Largest drawdowns from peak to trough. Tracks running peak; when wealth falls,
- * records the minimum (trough) until a new peak. Returns worst 3 by magnitude.
- * Do not reset currentDrawdown when entering a drawdown—otherwise the first
- * trough can be overwritten by a later, smaller drawdown (e.g. during recovery).
+ * Largest drawdowns from peak to trough to recovery (recovery = wealth back at or above
+ * prior peak). Wealth is compounded starting at $1 before the first month.
+ * Returns up to three worst completed / in-progress episodes by depth vs that peak (most negative first).
+ *
+ * Uses a tiny relative epsilon on peak wealth so compounded paths recover when they reclaim
+ * a prior peak in practice (float noise), not only on strict inequality.
+ * Series is sorted by calendar month ascending before processing.
  */
 const calculateDrawdowns = (returns: MonthlyReturn[]): Drawdown[] => {
     if (returns.length === 0) return [];
 
+    const chronological = [...returns].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    const relTol = (value: number) => Math.max(1e-15, Math.abs(value) * 1e-12);
+
     let wealthIndex = 1;
     let peakWealth = 1;
-    let peakDate = returns[0].date;
+    let peakDate = chronological[0].date;
     let troughWealth = 1;
-    let troughDate = returns[0].date;
-    
+    let troughDate = chronological[0].date;
+
     let currentDrawdown = 0;
     let inDrawdown = false;
     const drawdowns: Drawdown[] = [];
-    
-    const wealthSeries = returns.map(r => wealthIndex *= (1 + r.value));
-    
+
+    const wealthSeries = chronological.map((r) => (wealthIndex *= (1 + r.value)));
+
     for (let i = 0; i < wealthSeries.length; i++) {
-        const currentDate = returns[i].date;
+        const currentDate = chronological[i].date;
         const currentWealth = wealthSeries[i];
 
-        if (currentWealth > peakWealth) {
-            if (inDrawdown) {
-                 // End of a drawdown
-                 drawdowns.push({
-                     peakDate,
-                     troughDate,
-                     recoveryDate: currentDate,
-                     drawdown: (troughWealth - peakWealth) / peakWealth,
-                 });
-                 inDrawdown = false;
-            }
+        const tolAtPeak = relTol(peakWealth);
+
+        /** Back to prior running peak within tolerance — closes an underwater episode */
+        const recovered = peakWealth > 0 && currentWealth + tolAtPeak >= peakWealth;
+
+        if (inDrawdown && recovered) {
+            drawdowns.push({
+                peakDate,
+                troughDate,
+                recoveryDate: currentDate,
+                drawdown: (troughWealth - peakWealth) / peakWealth,
+            });
+            inDrawdown = false;
+            currentDrawdown = 0;
             peakWealth = currentWealth;
             peakDate = currentDate;
             troughWealth = currentWealth;
             troughDate = currentDate;
-        } else {
-            const drawdown = (currentWealth - peakWealth) / peakWealth;
-            if (drawdown < currentDrawdown) {
-                 currentDrawdown = drawdown;
-                 troughWealth = currentWealth;
-                 troughDate = currentDate;
-                 if (!inDrawdown) {
-                     inDrawdown = true;
-                 }
+            continue;
+        }
+
+        if (!inDrawdown && currentWealth > peakWealth + tolAtPeak) {
+            currentDrawdown = 0;
+            peakWealth = currentWealth;
+            peakDate = currentDate;
+            troughWealth = currentWealth;
+            troughDate = currentDate;
+            continue;
+        }
+
+        const drawdown = (currentWealth - peakWealth) / peakWealth;
+        if (drawdown < currentDrawdown) {
+            currentDrawdown = drawdown;
+            troughWealth = currentWealth;
+            troughDate = currentDate;
+            if (currentWealth + tolAtPeak < peakWealth) {
+                inDrawdown = true;
             }
         }
     }
-    
-    // If still in drawdown at the end
+
     if (inDrawdown) {
         drawdowns.push({
             peakDate,
             troughDate,
             recoveryDate: null,
-            drawdown: (troughWealth - peakWealth) / peakWealth
+            drawdown: (troughWealth - peakWealth) / peakWealth,
         });
     }
 
@@ -294,6 +352,37 @@ const calculateIRRForPeriod = (
 };
 
 
+/**
+ * Annual strategist (model) fee as a percentage (e.g. 0.32 for 0.32% per year).
+ * Uploaded monthly returns are full gross (no embedded fees); strategist, platform, and adviser
+ * fees are subtracted uniformly from monthly returns when computing net client performance.
+ */
+export const STRATEGIST_FEE_ANNUAL_PERCENT = 0.32;
+
+/**
+ * Weighted blend of uploaded monthly returns across sleeves. No fees are applied.
+ * Use for gross performance; combine with adjustReturnsByFee via blendPortfolios for net.
+ */
+export const blendUploadedGrossReturns = (weightedSeries: WeightedMonthlySeries[]): MonthlyReturn[] => {
+    if (weightedSeries.length === 0) return [];
+
+    const monthKeys = intersectMonthlyDatesAcrossSeries(weightedSeries);
+    if (monthKeys.length === 0) return [];
+
+    const maps = weightedSeries.map((ws) => new Map(ws.returns.map((r) => [r.date, r])));
+
+    return monthKeys.map((date) => {
+        let total = 0;
+        for (let i = 0; i < weightedSeries.length; i++) {
+            const ret = maps[i].get(date);
+            if (ret !== undefined) {
+                total += ret.value * weightedSeries[i].weight;
+            }
+        }
+        return { date, value: total };
+    });
+};
+
 /** Platform fee waterfall tiers: [maxAccountValue, feeRate]. Fee rate as decimal (e.g. 0.004 = 0.4%). */
 export const PLATFORM_FEE_TIERS: { maxValue: number; rate: number }[] = [
     { maxValue: 250_000, rate: 0.004 },
@@ -330,11 +419,8 @@ export const calculatePlatformFeeFromWaterfall = (accountValue: number): number 
 };
 
 /**
- * Adjusts monthly returns by deducting an annual adviser fee on a pro-rata basis.
- * If annual fee is 1%, each monthly return is reduced by (1/12)% = 0.0833%
- * @param returns - Array of monthly returns to adjust
- * @param annualFeePercent - Annual fee as a percentage (e.g., 1 for 1%)
- * @returns Adjusted monthly returns
+ * Subtracts a total annual fee rate from each monthly return (annual % ÷ 12 per month).
+ * Used for net client returns: pass strategist + platform + adviser as one combined annual %.
  */
 export const adjustReturnsByFee = (returns: MonthlyReturn[], annualFeePercent: number): MonthlyReturn[] => {
     if (annualFeePercent <= 0 || !annualFeePercent) {
@@ -350,40 +436,24 @@ export const adjustReturnsByFee = (returns: MonthlyReturn[], annualFeePercent: n
     }));
 };
 
+/**
+ * Client net blended returns: weighted uploaded gross minus strategist, adviser, and platform
+ * fees (combined annual rate, deducted evenly across months).
+ */
 export const blendPortfolios = (
-    weightedStrategies: (Strategy & { weight: number })[], 
+    weightedStrategies: (Strategy & { weight: number })[],
     annualFeePercent?: number,
     platformFeePercent?: number
 ): MonthlyReturn[] => {
-    if (weightedStrategies.length === 0) return [];
-    
-    const firstStrategy = weightedStrategies[0];
-    const blendedReturns: MonthlyReturn[] = firstStrategy.returns.map(r => ({ date: r.date, value: 0 }));
-
-    blendedReturns.forEach((br, index) => {
-        let totalReturnValue = 0;
-        for (const ws of weightedStrategies) {
-            // Find the corresponding return by date, assuming dates are aligned
-            const matchingReturn = ws.returns.find(r => r.date === br.date);
-            if(matchingReturn){
-                totalReturnValue += matchingReturn.value * ws.weight;
-            }
-        }
-        br.value = totalReturnValue;
-    });
-
-    // Apply fee adjustments (adviser + platform). Fees are additive.
-    const totalFeePercent = (annualFeePercent || 0) + (platformFeePercent || 0);
-    if (totalFeePercent > 0) {
-        return adjustReturnsByFee(blendedReturns, totalFeePercent);
-    }
-
-    return blendedReturns;
+    const blendedReturns = blendUploadedGrossReturns(weightedStrategies);
+    const clientFeePercent = (annualFeePercent || 0) + (platformFeePercent || 0);
+    const totalFeePercent = STRATEGIST_FEE_ANNUAL_PERCENT + clientFeePercent;
+    return adjustReturnsByFee(blendedReturns, totalFeePercent);
 };
 
 /**
+ * @deprecated Prefer passing pre-trimmed return series aligned to the portfolio; kept for callers that still anchor to December year-end.
  * Returns the latest year-end month (December) in the series, e.g. '2025-12'.
- * Used so all 1/3/5/10 calculations end with the most recent year-end.
  */
 export const getLatestYearEndMonth = (returns: MonthlyReturn[]): string | undefined => {
     for (let i = returns.length - 1; i >= 0; i--) {
@@ -405,7 +475,7 @@ export const calculateMetrics = (
     const monthlyDistribution = annualDistribution / 12;
     const useIRR = investmentAmount > 0 && monthlyDistribution > 0;
 
-    // When asOfEndMonth is set (e.g. for secondary portfolio), 1/3/5/10 use series through that month; rest use full returns
+    // When asOfEndMonth is set, 1/3/5/10 use series through that month; vol, drawdown, rolling, and growth use same series
     const returnsMetrics = series.length > 0
         ? {
             '1 Year': useIRR ? calculateIRRForPeriod(series, 1, investmentAmount, monthlyDistribution) : calculateAnnualizedReturn(series, 1),
@@ -415,11 +485,11 @@ export const calculateMetrics = (
         }
         : { '1 Year': null as number | null, '3 Year': null, '5 Year': null, '10 Year': null };
 
-    const rolling12m = calculateRollingReturns(returns, 12);
+    const rolling12m = calculateRollingReturns(series, 12);
     const rollingAnalysis = analyzeRollingReturns(rolling12m);
     let distributionAnalysis: DistributionAnalysis | undefined = undefined;
     const tenYearReturn = returnsMetrics['10 Year'];
-    const volatility = calculateAnnualizedVolatility(returns);
+    const volatility = calculateAnnualizedVolatility(series);
 
     if (clientAge > 0 && investmentAmount > 0 && annualDistribution > 0 && tenYearReturn !== null && volatility !== null) {
         distributionAnalysis = runMonteCarloSimulation(
@@ -434,15 +504,86 @@ export const calculateMetrics = (
 
     return {
         returns: returnsMetrics,
-        volatility: calculateAnnualizedVolatility(returns),
-        drawdowns: calculateDrawdowns(returns),
+        volatility,
+        drawdowns: calculateDrawdowns(series),
         rollingReturnsAnalysis: {
             percentPositive: rollingAnalysis.percentPositive,
             percentNegative: rollingAnalysis.percentNegative,
         },
         rollingReturnsDistribution: rollingAnalysis.distribution,
-        growthOfDollar: calculateGrowthOfDollar(returns),
+        growthOfDollar: calculateGrowthOfDollar(series),
         returnType: useIRR ? 'IRR' : 'TWR',
         distributionAnalysis,
+        performanceAsOf: series.length > 0 ? series[series.length - 1].date : null,
+    };
+};
+
+/**
+ * Builds minimal PerformanceMetrics for a manually entered secondary portfolio.
+ * Used only in Performance Table and Growth of Dollar. Returns null if manual has no valid data.
+ * @param manual - User-entered name, 1/3/5/10 returns (as decimals, e.g. 0.08 for 8%), volatility
+ * @param primaryDateRange - { startDate, endDate } in YYYY-MM to align growth series start with primary; end uses manual.returnsAsOf when set
+ */
+export const buildManualSecondaryPortfolioMetrics = (
+    manual: SecondaryPortfolioManual,
+    primaryDateRange: { startDate: string; endDate: string }
+): (PerformanceMetrics & { name: string; isManualOnly: boolean; returnsAsOf?: string | null }) | null => {
+    const hasAnyReturn = manual.returns1Y != null || manual.returns3Y != null || manual.returns5Y != null || manual.returns10Y != null;
+    if (!manual.name?.trim() || !hasAnyReturn) return null;
+
+    const returns = {
+        '1 Year': manual.returns1Y,
+        '3 Year': manual.returns3Y,
+        '5 Year': manual.returns5Y,
+        '10 Year': manual.returns10Y,
+    };
+
+    const yyyyMm = manual.returnsAsOf?.trim();
+    const endDate =
+        yyyyMm && /^\d{4}-\d{2}$/.test(yyyyMm)
+            ? yyyyMm
+            : primaryDateRange.endDate;
+
+    // Synthesize growthOfDollar: use longest available return as constant monthly rate over primary start through chosen end
+    const annualReturn = manual.returns10Y ?? manual.returns5Y ?? manual.returns3Y ?? manual.returns1Y ?? 0;
+    const monthlyRate = Math.pow(1 + annualReturn, 1 / 12) - 1;
+
+    const growthOfDollar: { date: string; value: number }[] = [];
+    const [startYear, startMonth] = primaryDateRange.startDate.split('-').map(Number);
+    const [endYear, endMonth] = endDate.split('-').map(Number);
+
+    let value = 1;
+    growthOfDollar.push({ date: primaryDateRange.startDate, value: 1 });
+
+    let y = startYear;
+    let m = startMonth;
+    m++;
+    if (m > 12) {
+        m = 1;
+        y++;
+    }
+    while (y < endYear || (y === endYear && m <= endMonth)) {
+        value *= 1 + monthlyRate;
+        const dateStr = `${y}-${String(m).padStart(2, '0')}`;
+        growthOfDollar.push({ date: dateStr, value });
+        m++;
+        if (m > 12) {
+            m = 1;
+            y++;
+        }
+    }
+
+    return {
+        returns,
+        volatility: manual.volatility,
+        drawdowns: [],
+        rollingReturnsAnalysis: { percentPositive: 0, percentNegative: 0 },
+        rollingReturnsDistribution: [],
+        growthOfDollar,
+        returnType: 'TWR' as const,
+        name: manual.name.trim(),
+        isManualOnly: true,
+        returnsAsOf: endDate,
+        performanceAsOf: endDate,
     };
 };

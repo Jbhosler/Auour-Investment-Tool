@@ -1,0 +1,23 @@
+{# Generated page - performance analysis. #}
+{% import "_base.html" as b with context %}
+{% call b.page(page_number, 'Performance Analysis', 'AS OF ' ~ proposal.as_of|upper, disclosures.discussion) %}
+<div class="grid3" style="margin-bottom:4px">
+  {{ b.statbox(performance.headline[0].label, performance.headline[0].value, performance.headline[0].caption, dark=True) }}
+  {{ b.statbox(performance.headline[1].label, performance.headline[1].value, performance.headline[1].caption) }}
+  {{ b.statbox(performance.headline[2].label, performance.headline[2].value, performance.headline[2].caption) }}
+</div>
+<h2>Key Performance Metrics</h2>
+<div class="small it" style="margin:-4px 0 6px">Comparative analysis of portfolio vs. benchmark &middot; As of {{ proposal.as_of }}</div>
+<table><thead><tr><th>Metric</th><th>Portfolio (Gross)</th><th style="background:var(--gold)">Portfolio (Net)</th><th>{{ benchmark.name }}</th></tr></thead><tbody>
+{% for r in performance.rows %}
+<tr><td>{{ r.metric }}</td><td>{{ r.gross }}</td>
+  <td class="b" style="background:#fbf5e3">{{ r.net }}{% if r.beats_benchmark %} <span class="pos">&uarr;</span>{% endif %}</td>
+  <td>{{ r.benchmark }}</td></tr>
+{% endfor %}
+</tbody></table>
+<div class="card" style="margin-top:16px;padding:12px 14px 14px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <h2 style="margin:0">Growth of {{ proposal.amount_long }}</h2><span class="lab">As of {{ proposal.as_of }}</span></div>
+  <div style="background:#fff;padding:8px;margin-top:8px"><img class="fig" src="{{ asset(charts.growth) }}" style="width:100%"></div>
+</div>
+{% endcall %}

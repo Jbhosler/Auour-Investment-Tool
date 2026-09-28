@@ -6,15 +6,45 @@
  * Sector, Market Cap, etc.
  */
 
-const TICKER_API_KEY = (process.env.TICKER_API_KEY || '').trim();
-const delayMs = Math.max(0, parseInt(process.env.ALPHAVANTAGE_DELAY_MS || '0', 10));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const AV_BASE = 'https://www.alphavantage.co/query';
+const AV_DELAY_MS = 900;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let _avQueue = Promise.resolve();
+let _didLogKeyDiagnostics = false;
+
+function getTickerApiKey() {
+  const raw = process.env.TICKER_API_KEY ?? '';
+  const key = raw.trim();
+  if (!key) throw new Error('TICKER_API_KEY environment variable not set');
+  if (raw !== key) {
+    console.warn('[av] TICKER_API_KEY contained leading/trailing whitespace; trimmed before use.');
+  }
+  if (!_didLogKeyDiagnostics) {
+    _didLogKeyDiagnostics = true;
+    console.log(`[av] Using AlphaVantage key fingerprint: len=${key.length}, suffix=...${key.slice(-4)}`);
+    if (!/^[A-Z0-9]{16}$/.test(key)) {
+      console.warn('[av] AlphaVantage key format looks unusual (expected 16 uppercase alphanumeric chars).');
+    }
+  }
+  return key;
+}
+
+async function avGet(params) {
+  return (_avQueue = _avQueue.then(async () => {
+    await sleep(AV_DELAY_MS);
+    const url = new URL(AV_BASE);
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, String(v));
+    }
+    url.searchParams.set('apikey', getTickerApiKey());
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }));
+}
 
 async function fetchOverview(ticker) {
-  const url = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${ticker}&apikey=${TICKER_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  const data = await avGet({ function: 'OVERVIEW', symbol: ticker });
   if (data['Error Message']) throw new Error(data['Error Message']);
   if (data['Note'] && /rate limit|burst/i.test(data['Note'])) throw new Error(data['Note']);
   if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
@@ -24,10 +54,7 @@ async function fetchOverview(ticker) {
 }
 
 async function fetchQuote(ticker) {
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${TICKER_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  const data = await avGet({ function: 'GLOBAL_QUOTE', symbol: ticker });
   if (data['Error Message']) throw new Error(data['Error Message']);
   const q = data['Global Quote'];
   if (!q) return null;
@@ -36,10 +63,7 @@ async function fetchQuote(ticker) {
 }
 
 async function fetchETFProfile(ticker) {
-  const url = `https://www.alphavantage.co/query?function=ETF_PROFILE&symbol=${ticker}&apikey=${TICKER_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+  const data = await avGet({ function: 'ETF_PROFILE', symbol: ticker });
   if (data['Error Message']) throw new Error(data['Error Message']);
   if (data['Note'] && /rate limit|burst/i.test(data['Note'])) throw new Error(data['Note']);
   if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
@@ -65,9 +89,7 @@ function parsePct(val) {
  * @returns {Promise<Array<{ strategyName, characteristics, tickerDetails }>>}
  */
 export async function fetchStrategiesOverview(strategies) {
-  if (!TICKER_API_KEY) {
-    throw new Error('TICKER_API_KEY environment variable not set');
-  }
+  getTickerApiKey();
 
   const results = [];
 
@@ -92,8 +114,6 @@ export async function fetchStrategiesOverview(strategies) {
       const w = weight / 100;
       totalWeight += w;
 
-      await sleep(delayMs);
-
       let overview = null;
       let etfProfile = null;
       let quote = null;
@@ -113,7 +133,6 @@ export async function fetchStrategiesOverview(strategies) {
 
       if (!overviewHasData) {
         try {
-          await sleep(delayMs);
           etfProfile = await fetchETFProfile(tickerUpper);
           usedETF = true;
         } catch (etfErr) {
@@ -130,7 +149,6 @@ export async function fetchStrategiesOverview(strategies) {
         continue;
       }
 
-      await sleep(delayMs);
       try {
         quote = await fetchQuote(tickerUpper);
       } catch {

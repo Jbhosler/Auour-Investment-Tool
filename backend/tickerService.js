@@ -1,5 +1,51 @@
 import { diagnosticLogger } from './diagnosticLogger.js';
 
+const AV_BASE = 'https://www.alphavantage.co/query';
+const AV_DELAY_MS = 900;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let _avQueue = Promise.resolve();
+let _didLogKeyDiagnostics = false;
+
+function getTickerApiKey() {
+  const raw = process.env.TICKER_API_KEY ?? '';
+  const key = raw.trim();
+  if (!key) {
+    throw new Error('TICKER_API_KEY environment variable not set');
+  }
+  if (raw !== key) {
+    diagnosticLogger.warn('TICKER_API_KEY contained leading/trailing whitespace; trimmed before use');
+  }
+  if (!_didLogKeyDiagnostics) {
+    _didLogKeyDiagnostics = true;
+    const suffix = key.slice(-4);
+    diagnosticLogger.info('Using AlphaVantage key fingerprint', {
+      keyLength: key.length,
+      keySuffix: `...${suffix}`
+    });
+    if (!/^[A-Z0-9]{16}$/.test(key)) {
+      diagnosticLogger.warn('AlphaVantage key format looks unusual (expected 16 uppercase alphanumeric chars)');
+    }
+  }
+  return key;
+}
+
+async function avGet(params) {
+  return (_avQueue = _avQueue.then(async () => {
+    await sleep(AV_DELAY_MS);
+    const url = new URL(AV_BASE);
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, String(v));
+    }
+    url.searchParams.set('apikey', getTickerApiKey());
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Alpha Vantage API error: ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+  }));
+}
+
 /**
  * Fetches monthly adjusted closing prices from Alpha Vantage API
  * and calculates monthly total returns, normalized to match the date range of primary strategy data.
@@ -12,7 +58,7 @@ import { diagnosticLogger } from './diagnosticLogger.js';
  *   date conventions (e.g. last trading day vs. official NAV date).
  */
 export const fetchSecondaryPortfolioReturns = async (tickers, weights, primaryReturnsDateRange) => {
-  const TICKER_API_KEY = (process.env.TICKER_API_KEY || '').trim();
+  const TICKER_API_KEY = getTickerApiKey();
   
   // Log key fingerprint only (first 4 + last 4 chars) to confirm which key is in use
   const keyFingerprint = TICKER_API_KEY && TICKER_API_KEY.length >= 8
@@ -47,22 +93,15 @@ export const fetchSecondaryPortfolioReturns = async (tickers, weights, primaryRe
     throw new Error(`Ticker weights must sum to 100% (current: ${totalWeight.toFixed(2)}%)`);
   }
 
-  // Alpha Vantage rate limit: avoid "Burst pattern detected" by spacing requests (ms between each ticker)
-  const delayMs = Math.max(0, parseInt(process.env.ALPHAVANTAGE_DELAY_MS || '0', 10));
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
   const fetchOneTicker = async (tickerObj) => {
     const ticker = tickerObj.ticker.toUpperCase().trim();
     diagnosticLogger.info(`Fetching data for ticker: ${ticker}`);
 
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${ticker}&apikey=${TICKER_API_KEY}&datatype=json`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Alpha Vantage API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const data = await avGet({
+      function: 'TIME_SERIES_MONTHLY_ADJUSTED',
+      symbol: ticker,
+      datatype: 'json'
+    });
 
     if (data['Error Message']) {
       diagnosticLogger.error(`Alpha Vantage error for ${ticker}`, { error: data['Error Message'] });
@@ -154,9 +193,6 @@ export const fetchSecondaryPortfolioReturns = async (tickers, weights, primaryRe
     const tickerResults = [];
     for (let i = 0; i < tickers.length; i++) {
       const tickerObj = tickers[i];
-      if (i > 0) {
-        await sleep(delayMs);
-      }
       try {
         const result = await fetchOneTicker(tickerObj);
         tickerResults.push(result);

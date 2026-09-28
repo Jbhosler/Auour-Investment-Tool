@@ -48,7 +48,7 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
              <div className="flex flex-col gap-8 mt-4">
                  <div>
                     <h3 className="text-lg font-medium text-center mb-2">By Strategy</h3>
-                    <div style={{ width: '100%', height: 300 }}>
+                    <div data-uld-chart="strategy" style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
                             <PieChart>
                                 <Pie
@@ -75,7 +75,7 @@ const AllocationCharts: React.FC<AllocationChartsProps> = ({ strategyAllocationD
                 </div>
                  <div>
                     <h3 className="text-lg font-medium text-center mb-2">By Asset Category</h3>
-                    <div style={{ width: '100%', height: 300 }}>
+                    <div data-uld-chart="category" style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
                             <PieChart>
                                 <Pie

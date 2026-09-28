@@ -1,0 +1,48 @@
+{# Generated page - executive summary. Standard chrome replaced by a navy hero band. #}
+{% import "_base.html" as b with context %}
+<div class="page" style="padding-top:0">
+  {{ b.decor() }}
+  <div class="deep" style="margin:0 -.6in 16px -.78in;padding:.5in .6in .32in .78in;text-align:center;position:relative">
+    <div class="dots" style="top:.18in;right:.3in;width:.95in;height:.42in;opacity:.75"></div>
+    <div class="lab g">Executive Summary</div>
+    <div style="width:.6in;height:1.5px;background:var(--gold);margin:9px auto 14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;gap:22px;align-items:center">
+      <div><div class="big" style="font-size:22pt;white-space:nowrap">{{ client.name }}</div><div class="small" style="color:#c9d5e3;margin-top:5px">Client name</div></div>
+      <div style="background:#3a5270;height:.6in"></div>
+      <div><div class="big" style="font-size:22pt;white-space:nowrap">{{ proposal.amount }}</div><div class="small" style="color:#c9d5e3;margin-top:5px">Investment amount</div></div>
+      <div style="background:#3a5270;height:.6in"></div>
+      <div><div class="big" style="font-size:22pt;white-space:nowrap">{{ proposal.risk_tolerance }}</div><div class="small" style="color:#c9d5e3;margin-top:5px">Risk tolerance</div></div>
+    </div>
+  </div>
+
+  <div class="grid2" style="gap:22px">
+    <div>
+      <h2 style="margin-top:0">Fees Applied to Portfolio</h2>
+      <p class="small it">{{ fees.note }}</p>
+      <table><thead><tr><th>Fee</th><th>Annual %</th></tr></thead><tbody>
+        {% for f in fees.lines %}<tr><td>{{ f.label }}</td><td>{{ f.value }}</td></tr>{% endfor %}
+        <tr class="total"><td>Total</td><td>{{ fees.total }}</td></tr>
+      </tbody></table>
+    </div>
+    <div>
+      <h2 style="margin-top:0">Portfolio Allocation</h2>
+      {% for a in allocation_charts %}
+      <div class="lab" style="margin-bottom:3px">{{ a.label }}</div>
+      <div class="figbox"{% if not loop.last %} style="margin-bottom:8px"{% endif %}><img class="fig" src="{{ asset(a.image) }}" style="height:.9in;margin:0 auto"></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <h2 style="margin-top:16px;border-top:3px solid var(--rule);padding-top:10px">Summary</h2>
+  {% for para in summary.paragraphs %}
+  {% if loop.first %}<p>{{ para }}</p>{% endif %}
+  {% endfor %}
+  {% if summary.pull_quote %}
+  <p class="it" style="font-size:12pt;color:var(--navy);border-left:3.5px solid var(--gold);padding-left:12px;line-height:1.3;margin:10px 0">{{ summary.pull_quote }}</p>
+  {% endif %}
+  {% for para in summary.paragraphs %}
+  {% if not loop.first %}<p{% if loop.last %} style="margin-bottom:0"{% endif %}>{{ para }}</p>{% endif %}
+  {% endfor %}
+
+  {{ b.footer(page_number, disclosures.discussion) }}
+</div>

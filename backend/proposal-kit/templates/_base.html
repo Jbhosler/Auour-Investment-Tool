@@ -1,0 +1,61 @@
+{#
+  Page chrome shared by every page in the deck.
+  `decor()`  - gold rule, dot grids, corner lines (pure CSS, no images)
+  `footer()` - fine print + brand bar + page number
+  `page()`   - full page wrapper with the standard title block; use as {% call page(...) %}body{% endcall %}
+#}
+
+{% macro decor() %}
+<div class="vbar"></div>
+<div class="dots" style="top:.18in;right:.3in;width:.95in;height:.42in;opacity:.75"></div>
+<div class="field" style="top:0;left:0;width:1.9in;height:.9in;-webkit-mask-image:linear-gradient(135deg,#000 20%,transparent 75%)"></div>
+<div class="field" style="bottom:0;right:0;width:1.6in;height:1.4in;-webkit-mask-image:linear-gradient(315deg,#000 15%,transparent 70%)"></div>
+<div class="gl" style="left:.08in;top:.72in;width:.3in"></div><div class="gl" style="left:.08in;top:.78in;width:.24in"></div><div class="gl" style="left:.08in;top:.84in;width:.3in"></div>
+<div class="dots" style="left:.1in;bottom:1.2in;width:.3in;height:.36in;opacity:.6"></div>
+<div class="gl" style="right:.3in;bottom:.62in;width:.55in"></div><div class="gl" style="right:.3in;bottom:.56in;width:.85in"></div>
+{% endmacro %}
+
+{% macro footer(page_number, fine='', fine_class='') %}
+<div class="ftr">
+  {% if fine %}<div class="fine {{ fine_class }}">{{ fine }}</div>{% endif %}
+  <div class="row">
+    <span class="brand">Auour<b>INVESTMENTS</b></span>
+    <span class="mid">{{ firm.footer_line }}</span>
+    <span class="pn">{{ page_number }}</span>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro page(page_number, title, subtitle='', fine='', fine_class='') %}
+<div class="page">
+  {{ decor() }}
+  <div class="ttl"><span>{{ title }}</span>{% if subtitle %}<small>{{ subtitle }}</small>{% endif %}</div>
+  {{ caller() }}
+  {{ footer(page_number, fine, fine_class) }}
+</div>
+{% endmacro %}
+
+{# Dark navy statement band. Used for section openers and "what this means" callouts. #}
+{% macro band(label, stats, statement='') %}
+<div class="deep" style="padding:16px 20px 18px;text-align:center">
+  <div class="lab g">{{ label }}</div>
+  <div style="width:.6in;height:1.5px;background:var(--gold);margin:9px auto 14px"></div>
+  {% if statement %}<div style="font-size:12.5pt;margin-bottom:12px">{{ statement }}</div>{% endif %}
+  <div style="display:flex;gap:22px;justify-content:space-around;align-items:center">
+    {% for s in stats %}
+      {% if not loop.first %}<div style="background:#3a5270;width:1px;height:.6in"></div>{% endif %}
+      <div><div class="big" style="font-size:22pt;white-space:nowrap">{{ s.value }}</div>
+      <div class="small" style="color:#c9d5e3;margin-top:5px">{{ s.label }}</div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{# Metric box trio used at the top of the performance page. #}
+{% macro statbox(label, value, caption, dark=false) %}
+<div class="{{ 'deep' if dark else 'card' }}" style="padding:12px 14px">
+  <div class="lab{{ ' g' if dark }}">{{ label }}</div>
+  <div class="{{ 'big' if dark }}" style="font-size:30pt;{{ '' if dark else 'color:var(--navy);' }}line-height:1;margin-top:4px">{{ value }}</div>
+  <div class="small" style="color:{{ '#c9d5e3' if dark else 'var(--slate)' }}">{{ caption }}</div>
+</div>
+{% endmacro %}

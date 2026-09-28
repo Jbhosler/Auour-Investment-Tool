@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fusion Investment Solutions — Auour Investments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #F7F4EF;
+      color: #0B1F3A;
+      min-height: 100vh;
+    }
+
+    /* ── CSS VARIABLES ── */
+    :root {
+      --navy:       #0B1F3A;
+      --navy-mid:   #1a3558;
+      --slate:      #3C5470;
+      --sage:       #6B8F71;
+      --sage-light: #A8C5AB;
+      --gold:       #B89A5E;
+      --gold-light: #D4B87A;
+      --cream:      #F7F4EF;
+      --mist:       #EBE8E2;
+      --white:      #ffffff;
+      --text-muted: #5A6D82;
+      --text-light: #8FA3B8;
+      --border:     rgba(11,31,58,0.12);
+      --border-md:  rgba(11,31,58,0.20);
+      --border-strong: rgba(11,31,58,0.28);
+      --green:      #2E7D52;
+      --red:        #B03A2E;
+    }
+
+    /* ── PAGE TRANSITIONS ── */
+    .page { display: none; animation: fadeIn .25s ease; }
+    .page.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ════════════════════════════════════
+       LANDING PAGE
+    ════════════════════════════════════ */
+    .hero {
+      background: var(--navy);
+      padding: 4rem 3rem 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 380px; height: 380px;
+      border-radius: 50%;
+      border: 1px solid rgba(184,154,94,0.15);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -100px; left: 40px;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      border: 1px solid rgba(107,143,113,0.18);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.1rem;
+    }
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 56px;
+      font-weight: 400;
+      color: #F7F4EF;
+      line-height: 1.05;
+      margin-bottom: 0.6rem;
+    }
+    .hero-title em {
+      font-style: italic;
+      color: var(--gold-light);
+    }
+    .hero-sub {
+      font-size: 14px;
+      font-weight: 300;
+      color: rgba(247,244,239,0.55);
+      line-height: 1.65;
+      margin-bottom: 2rem;
+      max-width: 500px;
+    }
+    .cap-strip {
+      display: flex;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+    .cap-block {
+      padding: 10px 24px 10px 0;
+      border-right: 1px solid rgba(247,244,239,0.12);
+      margin-right: 24px;
+    }
+    .cap-block:last-child { border-right: none; margin-right: 0; }
+    .cap-label {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 3px;
+    }
+    .cap-desc {
+      font-size: 11px;
+      color: rgba(247,244,239,0.4);
+      font-weight: 300;
+    }
+
+    /* ── SECTION ── */
+    .section-div {
+      padding: 2.5rem 3rem 1.25rem;
+    }
+    .section-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 0.5rem;
+    }
+    .section-heading {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--navy);
+      line-height: 1.2;
+      margin-bottom: 0.4rem;
+    }
+    .section-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      max-width: 560px;
+    }
+
+    /* ── MATRIX ── */
+    .matrix-wrap {
+      padding: 0 3rem;
+    }
+    .axis-row {
+      display: grid;
+      grid-template-columns: 96px 1fr 1fr 1fr;
+      margin-bottom: 6px;
+    }
+    .axis-cell { /* blank top-left */ }
+    .axis-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      text-align: center;
+      padding: 7px 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .axis-label.act {
+      color: var(--navy);
+      border-color: var(--navy-mid);
+    }
+    .obj-row {
+      display: grid;
+      grid-template-columns: 96px 1fr 1fr 1fr;
+      margin-bottom: 6px;
+    }
+    .obj-label {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-right: 14px;
+      border-right: 1px solid var(--border);
+    }
+    .obj-label-text {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+    .obj-label-sub {
+      font-size: 9px;
+      color: var(--text-light);
+      margin-top: 3px;
+    }
+
+    /* ── PORTFOLIO CARDS ── */
+    .pcard {
+      margin: 4px;
+      padding: 16px 15px 13px;
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .pcard::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px;
+      height: 100%;
+      background: var(--ca, var(--sage));
+      opacity: 0.55;
+      transition: opacity 0.18s;
+    }
+    .pcard:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(11,31,58,0.09);
+    }
+    .pcard:hover::before { opacity: 1; }
+    .ca-income     { --ca: var(--gold); }
+    .ca-protection { --ca: var(--sage); }
+    .ca-accum      { --ca: var(--navy-mid); }
+
+    .card-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--text-light);
+      margin-bottom: 4px;
+    }
+    .card-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--navy);
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+    .card-sub {
+      font-size: 10px;
+      color: var(--text-light);
+      margin-bottom: 9px;
+      line-height: 1.4;
+    }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .bar-lbl {
+      font-size: 9px;
+      color: var(--text-muted);
+      min-width: 50px;
+      font-weight: 500;
+    }
+    .bar-track {
+      flex: 1;
+      height: 4px;
+      background: var(--mist);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .bar-fill { height: 100%; border-radius: 2px; }
+    .bf-uld  { background: var(--gold); }
+    .bf-mai  { background: #8B7BB8; }
+    .bf-au   { background: var(--navy); }
+    .bf-au2  { background: var(--slate); }
+    .bf-lear { background: var(--sage); }
+    .bar-pct {
+      font-size: 9px;
+      color: var(--text-light);
+      min-width: 26px;
+      text-align: right;
+    }
+    .card-hint {
+      font-size: 9px;
+      color: var(--text-light);
+      margin-top: 10px;
+    }
+
+    /* ── LEGEND ── */
+    .legend-strip {
+      display: flex;
+      gap: 18px;
+      padding: 1.5rem 3rem 0;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .legend-title {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-right: 4px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    /* ── FOOTER BAR ── */
+    .footer-bar {
+      margin: 3rem 3rem 0;
+      padding: 1.5rem 2rem;
+      background: var(--navy);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      color: var(--white);
+      font-style: italic;
+    }
+    .footer-sub {
+      font-size: 11px;
+      color: rgba(247,244,239,0.4);
+      margin-top: 3px;
+    }
+    .page-bottom-pad { height: 3rem; }
+
+    /* ════════════════════════════════════
+       DETAIL PAGE
+    ════════════════════════════════════ */
+    .det-header {
+      background: var(--navy);
+      padding: 1.75rem 3rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+    }
+    .back-btn {
+      background: rgba(247,244,239,0.1);
+      border: 0.5px solid rgba(247,244,239,0.22);
+      border-radius: 7px;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: rgba(247,244,239,0.75);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: background 0.15s;
+      white-space: nowrap;
+      margin-top: 4px;
+    }
+    .back-btn:hover { background: rgba(247,244,239,0.2); }
+    .det-hdr-info { flex: 1; }
+    .det-num {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .det-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 36px;
+      color: var(--white);
+      line-height: 1.1;
+    }
+    .det-badge {
+      display: inline-flex;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 100px;
+      margin-top: 8px;
+    }
+    .db-income     { background: rgba(184,154,94,0.22); color: var(--gold-light); }
+    .db-protection { background: rgba(107,143,113,0.22); color: var(--sage-light); }
+    .db-accum      { background: rgba(100,130,180,0.22); color: #93b3d8; }
+
+    .det-body {
+      padding: 2rem 3rem;
+      max-width: 1100px;
+    }
+
+    /* ── ALLOC STRIP ── */
+    .alloc-strip {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .strip-title {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 1rem;
+    }
+    .alloc-bars { display: flex; flex-direction: column; gap: 10px; }
+    .ab-row { display: flex; align-items: center; gap: 12px; }
+    .ab-lbl { font-size: 13px; font-weight: 500; color: var(--navy); min-width: 200px; }
+    .ab-track {
+      flex: 1;
+      height: 8px;
+      background: var(--mist);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .ab-fill { height: 100%; border-radius: 4px; }
+    .ab-pct { font-size: 13px; font-weight: 500; color: var(--text-muted); min-width: 40px; text-align: right; }
+    .asset-meta {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 0.5px solid var(--border);
+      display: flex;
+      gap: 2.5rem;
+      flex-wrap: wrap;
+    }
+    .meta-item { font-size: 12px; color: var(--text-muted); }
+    .meta-val { font-weight: 500; color: var(--navy); }
+
+    /* ── HIGHLIGHT CARDS ── */
+    .highlights {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .hl-card {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .hl-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 6px;
+    }
+    .hl-val {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 36px;
+      font-weight: 500;
+      color: var(--navy);
+      line-height: 1;
+    }
+    .hl-val.red { color: var(--red); }
+    .hl-bench { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+    .hl-diff { font-size: 11px; font-weight: 500; margin-top: 3px; color: var(--green); }
+
+    /* ── METRICS GRID ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .metric-card {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.75rem;
+    }
+    .mc-title {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 1.1rem;
+    }
+
+    /* Performance table */
+    .perf-head {
+      display: grid;
+      grid-template-columns: 1fr 100px 120px;
+      margin-bottom: 8px;
+    }
+    .ph-cell {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      text-align: right;
+    }
+    .ph-cell:first-child { text-align: left; }
+    .perf-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 120px;
+      padding: 9px 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .perf-row:last-child { border-bottom: none; }
+    .pr-metric { font-size: 13px; color: var(--text-muted); }
+    .pr-port { font-size: 14px; font-weight: 500; text-align: right; color: var(--navy); }
+    .pr-port.up { color: var(--green); }
+    .pr-bench { font-size: 13px; text-align: right; color: var(--text-muted); }
+
+    /* Drawdown table */
+    .dd-head {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      margin-bottom: 7px;
+    }
+    .dd-hc {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-light);
+    }
+    .dd-row {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      padding: 8px 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .dd-row:last-child { border-bottom: none; }
+    .dd-dec { font-size: 14px; font-weight: 500; color: var(--red); }
+    .dd-dec.muted { color: var(--text-muted); font-size: 13px; }
+    .dd-date { font-size: 12px; color: var(--text-muted); align-self: center; }
+    .bench-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 0.5px solid var(--border);
+    }
+    .bench-label {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 8px;
+    }
+
+    /* ── SUMMARY CARD ── */
+    .summary-card {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .sum-text {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.75;
+    }
+
+    /* ── DISCLOSURE ── */
+    .disclosure {
+      font-size: 10px;
+      color: var(--text-light);
+      line-height: 1.7;
+      padding: 1.25rem 0 2rem;
+      border-top: 0.5px solid var(--border);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .hero { padding: 2.5rem 1.5rem 2rem; }
+      .hero-title { font-size: 38px; }
+      .section-div { padding: 2rem 1.5rem 1rem; }
+      .matrix-wrap { padding: 0 1.5rem; }
+      .axis-row { grid-template-columns: 70px 1fr 1fr 1fr; }
+      .obj-row { grid-template-columns: 70px 1fr 1fr 1fr; }
+      .legend-strip { padding: 1.25rem 1.5rem 0; }
+      .footer-bar { margin: 2rem 1.5rem 0; }
+      .det-header { padding: 1.5rem; }
+      .det-title { font-size: 26px; }
+      .det-body { padding: 1.5rem; }
+      .highlights { grid-template-columns: 1fr 1fr; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .ab-lbl { min-width: 140px; font-size: 12px; }
+    }
+    @media (max-width: 480px) {
+      .highlights { grid-template-columns: 1fr; }
+      .axis-row { grid-template-columns: 56px 1fr 1fr 1fr; }
+      .obj-row { grid-template-columns: 56px 1fr 1fr 1fr; }
+      .card-name { font-size: 11px; }
+      .card-sub { font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     LANDING PAGE
+════════════════════════════════════ -->
+<div id="page-landing" class="page active">
+
+  <div class="hero">
+    <div class="hero-eyebrow">Fusion Investment Solutions</div>
+    <div class="hero-title">Independent<br>Perspectives.<br><em>One Solution.</em></div>
+    <div class="hero-sub">Nine purpose-built portfolios combining complementary managers across three distinct capabilities — matched precisely to every client's objective and risk profile.</div>
+    <div class="cap-strip">
+      <div class="cap-block">
+        <div class="cap-label">Strategic</div>
+        <div class="cap-desc">Core long-term positioning</div>
+      </div>
+      <div class="cap-block">
+        <div class="cap-label">Thematic</div>
+        <div class="cap-desc">Global value perspectives</div>
+      </div>
+      <div class="cap-block">
+        <div class="cap-label">Protective</div>
+        <div class="cap-desc">Active downside management</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-div">
+    <div class="section-label">Portfolio Matrix</div>
+    <div class="section-heading">Match Every Client</div>
+    <div class="section-desc">Select by investment objective and risk tolerance. Click any portfolio to view full performance detail.</div>
+  </div>
+
+  <div class="matrix-wrap">
+    <div class="axis-row">
+      <div class="axis-cell"></div>
+      <div class="axis-label act">Mod. Conservative</div>
+      <div class="axis-label act">Moderate</div>
+      <div class="axis-label act">Mod. Aggressive</div>
+    </div>
+
+    <!-- INCOME ROW -->
+    <div class="obj-row">
+      <div class="obj-label">
+        <div class="obj-label-text">Income</div>
+        <div class="obj-label-sub">Ages 70+</div>
+      </div>
+      <div class="pcard ca-income" onclick="showDetail(0)">
+        <div class="card-num">P · 01</div>
+        <div class="card-name">Conservative Income</div>
+        <div class="card-sub">100% Auour ULD</div>
+        <div class="bar-row"><span class="bar-lbl">ULD</span><div class="bar-track"><div class="bar-fill bf-uld" style="width:100%"></div></div><span class="bar-pct">100%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+      <div class="pcard ca-income" onclick="showDetail(1)">
+        <div class="card-num">P · 02</div>
+        <div class="card-name">Balanced Income</div>
+        <div class="card-sub">50% MAI / 50% ULD</div>
+        <div class="bar-row"><span class="bar-lbl">MAI</span><div class="bar-track"><div class="bar-fill bf-mai" style="width:50%"></div></div><span class="bar-pct">50%</span></div>
+        <div class="bar-row"><span class="bar-lbl">ULD</span><div class="bar-track"><div class="bar-fill bf-uld" style="width:50%"></div></div><span class="bar-pct">50%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+      <div class="pcard ca-income" onclick="showDetail(2)">
+        <div class="card-num">P · 03</div>
+        <div class="card-name">Growth Income</div>
+        <div class="card-sub">100% Auour MAI</div>
+        <div class="bar-row"><span class="bar-lbl">MAI</span><div class="bar-track"><div class="bar-fill bf-mai" style="width:100%"></div></div><span class="bar-pct">100%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+    </div>
+
+    <!-- PROTECTION ROW -->
+    <div class="obj-row">
+      <div class="obj-label">
+        <div class="obj-label-text">Protection</div>
+        <div class="obj-label-sub">Ages 55–70</div>
+      </div>
+      <div class="pcard ca-protection" onclick="showDetail(3)">
+        <div class="card-num">P · 04</div>
+        <div class="card-name">Conservative Balanced</div>
+        <div class="card-sub">100% Auour Global Balanced</div>
+        <div class="bar-row"><span class="bar-lbl">Auour Bal.</span><div class="bar-track"><div class="bar-fill bf-au" style="width:100%"></div></div><span class="bar-pct">100%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+      <div class="pcard ca-protection" onclick="showDetail(4)">
+        <div class="card-num">P · 05</div>
+        <div class="card-name">Balanced Core</div>
+        <div class="card-sub">75% Auour Balanced / 25% Lear GV</div>
+        <div class="bar-row"><span class="bar-lbl">Auour Bal.</span><div class="bar-track"><div class="bar-fill bf-au" style="width:75%"></div></div><span class="bar-pct">75%</span></div>
+        <div class="bar-row"><span class="bar-lbl">Lear GV</span><div class="bar-track"><div class="bar-fill bf-lear" style="width:25%"></div></div><span class="bar-pct">25%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+      <div class="pcard ca-protection" onclick="showDetail(5)">
+        <div class="card-num">P · 06</div>
+        <div class="card-name">Growth Balanced</div>
+        <div class="card-sub">70% Auour Equity / 30% Lear GV</div>
+        <div class="bar-row"><span class="bar-lbl">Auour Eq.</span><div class="bar-track"><div class="bar-fill bf-au" style="width:70%"></div></div><span class="bar-pct">70%</span></div>
+        <div class="bar-row"><span class="bar-lbl">Lear GV</span><div class="bar-track"><div class="bar-fill bf-lear" style="width:30%"></div></div><span class="bar-pct">30%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+    </div>
+
+    <!-- ACCUMULATION ROW -->
+    <div class="obj-row">
+      <div class="obj-label">
+        <div class="obj-label-text">Accumulation</div>
+        <div class="obj-label-sub">Ages 35–55</div>
+      </div>
+      <div class="pcard ca-accum" onclick="showDetail(6)">
+        <div class="card-num">P · 07</div>
+        <div class="card-name">Conservative Growth</div>
+        <div class="card-sub">50% Auour Equity / 50% Auour Balanced</div>
+        <div class="bar-row"><span class="bar-lbl">Auour Eq.</span><div class="bar-track"><div class="bar-fill bf-au" style="width:50%"></div></div><span class="bar-pct">50%</span></div>
+        <div class="bar-row"><span class="bar-lbl">Auour Bal.</span><div class="bar-track"><div class="bar-fill bf-au2" style="width:50%"></div></div><span class="bar-pct">50%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+      <div class="pcard ca-accum" onclick="showDetail(7)">
+        <div class="card-num">P · 08</div>
+        <div class="card-name">Balanced Growth</div>
+        <div class="card-sub">75% Auour Equity / 25% Lear GV</div>
+        <div class="bar-row"><span class="bar-lbl">Auour Eq.</span><div class="bar-track"><div class="bar-fill bf-au" style="width:75%"></div></div><span class="bar-pct">75%</span></div>
+        <div class="bar-row"><span class="bar-lbl">Lear GV</span><div class="bar-track"><div class="bar-fill bf-lear" style="width:25%"></div></div><span class="bar-pct">25%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+      <div class="pcard ca-accum" onclick="showDetail(8)">
+        <div class="card-num">P · 09</div>
+        <div class="card-name">Aggressive Growth</div>
+        <div class="card-sub">50% Auour Equity / 50% Lear GV</div>
+        <div class="bar-row"><span class="bar-lbl">Auour Eq.</span><div class="bar-track"><div class="bar-fill bf-au" style="width:50%"></div></div><span class="bar-pct">50%</span></div>
+        <div class="bar-row"><span class="bar-lbl">Lear GV</span><div class="bar-track"><div class="bar-fill bf-lear" style="width:50%"></div></div><span class="bar-pct">50%</span></div>
+        <div class="card-hint">→ View performance</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend-strip">
+    <span class="legend-title">Managers</span>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div>ULD — Auour Ultra Low Duration</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8B7BB8"></div>MAI — Auour Multi Asset Income</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--navy)"></div>Auour Global Equity / Balanced</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--sage)"></div>Lear GV Moderate</div>
+  </div>
+
+  <div class="footer-bar">
+    <div>
+      <div class="footer-text">Independent perspectives. One solution.</div>
+      <div class="footer-sub">For use with Financial Advisors only &nbsp;·&nbsp; Not for use with clients</div>
+    </div>
+  </div>
+  <div class="page-bottom-pad"></div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     DETAIL PAGE
+════════════════════════════════════ -->
+<div id="page-detail" class="page">
+  <div id="detail-content"></div>
+</div>
+
+
+<script>
+  /* ── DATA ── */
+  const PORTFOLIOS = [
+    {
+      num: 'P · 01', name: 'Conservative Income',
+      objClass: 'income', obj: 'Income Generation · Ages 70+',
+      sub: '100% Auour Ultra Low Duration',
+      assetSplit: '~100% Fixed Income', growth: '$1,257,806',
+      allocs: [{ l: 'Auour Ultra Low Duration', p: 100, c: 'bf-uld' }],
+      bench: '1–3 Yr Govt Bond',
+      returns: [
+        { label: '1-Year Return',        port: '5.03', bench: '5.03' },
+        { label: '3-Year Ann. Return',   port: '5.32', bench: '4.37' },
+        { label: '5-Year Ann. Return',   port: '3.13', bench: '1.63' },
+        { label: '10-Year Ann. Return',  port: '2.40', bench: '1.71' },
+        { label: 'Ann. Volatility',      port: '1.20', bench: '1.53' },
+      ],
+      vol: { p: '1.20', b: '1.53' },
+      posPct: '81.9',
+      maxDD: { p: '-2.18%', b: '-5.44%' },
+      dd:  [{ d: '-2.18%', dt: '2020-02 to 2020-03' }, { d: '-0.83%', dt: '2015-05 to 2015-12' }],
+      bdd: [{ d: '-5.44%', dt: '2021-01 to 2022-10' }, { d: '-0.83%', dt: '2017-08 to 2018-02' }, { d: '-0.63%', dt: '2016-06 to 2016-11' }],
+      summary: 'Consistently superior long-term returns versus the 1–3 Year Government Bond benchmark, particularly over 3, 5, and 10-year periods — achieved with markedly lower annualized volatility. The portfolio\'s most significant historical drawdown was less than half that of the benchmark\'s largest decline, reflecting Auour\'s core strength in capital preservation and downside resilience.'
+    },
+    {
+      num: 'P · 02', name: 'Balanced Income',
+      objClass: 'income', obj: 'Income Generation · Ages 70+',
+      sub: '50% Auour Multi Asset Income / 50% Auour Ultra Low Duration',
+      assetSplit: '~80% Equity / ~20% Fixed Income', growth: '$1,438,708',
+      allocs: [{ l: 'Auour Multi Asset Income', p: 50, c: 'bf-mai' }, { l: 'Auour Ultra Low Duration', p: 50, c: 'bf-uld' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '5.93',  bench: '8.34' },
+        { label: '3-Year Ann. Return',   port: '6.02',  bench: '7.53' },
+        { label: '5-Year Ann. Return',   port: '2.21',  bench: '3.60' },
+        { label: '10-Year Ann. Return',  port: '2.87',  bench: '3.79' },
+        { label: 'Ann. Volatility',      port: '2.98',  bench: '3.20' },
+      ],
+      vol: { p: '2.98', b: '3.20' },
+      posPct: '70.9',
+      maxDD: { p: '-8.34%', b: '-9.11%' },
+      dd:  [{ d: '-8.34%', dt: '2020-07 to 2022-09' }, { d: '-3.63%', dt: '2015-02 to 2015-08' }, { d: '-1.49%', dt: '2014-08 to 2014-09' }],
+      bdd: [{ d: '-9.11%', dt: '2021-08 to 2022-09' }, { d: '-2.59%', dt: '2020-01 to 2020-03' }, { d: '-2.29%', dt: '2015-05 to 2016-02' }],
+      summary: 'A disciplined, risk-aware blend combining income generation with capital preservation. While headline performance figures reflect Auour\'s strategy to prioritize quality of returns over benchmark-chasing, the portfolio demonstrates superior downside protection — experiencing notably shallower and more contained drawdowns across various market stress environments with lower annualized volatility than the blended benchmark.'
+    },
+    {
+      num: 'P · 03', name: 'Growth Income',
+      objClass: 'income', obj: 'Income Generation · Ages 70+',
+      sub: '100% Auour Multi Asset Income',
+      assetSplit: '~60% Equity / ~40% Fixed Income', growth: '$1,588,951',
+      allocs: [{ l: 'Auour Multi Asset Income', p: 100, c: 'bf-mai' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '6.83',  bench: '13.62' },
+        { label: '3-Year Ann. Return',   port: '6.61',  bench: '10.32' },
+        { label: '5-Year Ann. Return',   port: '1.21',  bench: '2.99' },
+        { label: '10-Year Ann. Return',  port: '3.29',  bench: '5.39' },
+        { label: 'Ann. Volatility',      port: '5.31',  bench: '8.23' },
+      ],
+      vol: { p: '5.31', b: '8.23' },
+      posPct: '66.9',
+      maxDD: { p: '-15.46%', b: '-22.64%' },
+      dd:  [{ d: '-15.46%', dt: '2020-07 to 2022-09' }, { d: '-6.63%', dt: '2015-02 to 2015-08' }, { d: '-2.97%', dt: '2014-08 to 2014-09' }],
+      bdd: [{ d: '-22.64%', dt: '2021-08 to 2022-09' }, { d: '-9.40%',  dt: '2020-01 to 2020-03' }, { d: '-7.90%',  dt: '2014-08 to 2016-01' }],
+      summary: 'Demonstrates a disciplined approach prioritizing capital preservation and a smoother investment experience. With significantly lower annualized volatility and notably smaller maximum drawdowns across market cycles — most severe drawdown approximately 7 percentage points shallower than the benchmark\'s — this portfolio provides enhanced downside resilience and a more stable return path for income-oriented investors.'
+    },
+    {
+      num: 'P · 04', name: 'Conservative Balanced',
+      objClass: 'protection', obj: 'Protection · Ages 55–70',
+      sub: '100% Auour Global Balanced',
+      assetSplit: '~60% Equity / ~40% Fixed Income', growth: '$1,946,857',
+      allocs: [{ l: 'Auour Global Balanced', p: 100, c: 'bf-au' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '13.55', bench: '16.45' },
+        { label: '3-Year Ann. Return',   port: '12.10', bench: '13.65' },
+        { label: '5-Year Ann. Return',   port: '5.60',  bench: '5.66' },
+        { label: '10-Year Ann. Return',  port: '6.21',  bench: '7.48' },
+        { label: 'Ann. Volatility',      port: '6.44',  bench: '10.02' },
+      ],
+      vol: { p: '6.44', b: '10.02' },
+      posPct: '80.3',
+      maxDD: { p: '-15.74%', b: '-23.35%' },
+      dd:  [{ d: '-15.74%', dt: '2021-12 to 2022-09' }, { d: '-5.72%',  dt: '2020-01 to 2020-03' }, { d: '-4.94%',  dt: '2015-04 to 2015-08' }],
+      bdd: [{ d: '-23.35%', dt: '2021-12 to 2022-09' }, { d: '-13.32%', dt: '2019-12 to 2020-03' }, { d: '-9.60%',  dt: '2018-01 to 2018-12' }],
+      summary: 'Designed to deliver a superior investment experience by prioritizing the quality of returns. Historically generating competitive long-term returns with substantially reduced volatility — investors benefit from a more consistent journey, as evidenced by 80.3% positive rolling 12-month periods. Most significant market correction was approximately 7.6 percentage points shallower than the benchmark\'s, demonstrating Auour\'s commitment to protecting capital during adverse market regimes.'
+    },
+    {
+      num: 'P · 05', name: 'Balanced Core',
+      objClass: 'protection', obj: 'Protection · Ages 55–70',
+      sub: '75% Auour Global Balanced / 25% Lear GV Moderate',
+      assetSplit: '~63% Equity / ~38% Fixed Income', growth: '$2,010,241',
+      allocs: [{ l: 'Auour Global Balanced', p: 75, c: 'bf-au' }, { l: 'Lear GV Moderate', p: 25, c: 'bf-lear' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '18.03', bench: '16.74' },
+        { label: '3-Year Ann. Return',   port: '14.14', bench: '13.99' },
+        { label: '5-Year Ann. Return',   port: '6.69',  bench: '5.92' },
+        { label: '10-Year Ann. Return',  port: '7.45',  bench: '7.69' },
+        { label: 'Ann. Volatility',      port: '7.68',  bench: '10.21' },
+      ],
+      vol: { p: '7.68', b: '10.21' },
+      posPct: '78.7',
+      maxDD: { p: '-16.88%', b: '-23.46%' },
+      dd:  [{ d: '-16.88%', dt: '2021-10 to 2022-09' }, { d: '-8.48%',  dt: '2020-01 to 2020-03' }, { d: '-6.86%',  dt: '2015-05 to 2016-01' }],
+      bdd: [{ d: '-23.46%', dt: '2021-12 to 2022-09' }, { d: '-13.74%', dt: '2019-12 to 2020-03' }, { d: '-9.84%',  dt: '2018-01 to 2018-12' }],
+      summary: 'A clear advantage in delivering high-quality returns, prioritizing capital preservation alongside growth. Introducing a 25% thematic allocation to Lear GV adds global diversification while maintaining a protective posture. Over most meaningful timeframes the portfolio has achieved competitive or superior returns versus the benchmark — while exhibiting substantially lower overall volatility and materially shallower drawdowns.'
+    },
+    {
+      num: 'P · 06', name: 'Growth Balanced',
+      objClass: 'protection', obj: 'Protection · Ages 55–70',
+      sub: '70% Auour Global Equity / 30% Lear GV Moderate',
+      assetSplit: '~91% Equity / ~9% Fixed Income', growth: '$2,630,148',
+      allocs: [{ l: 'Auour Global Equity', p: 70, c: 'bf-au' }, { l: 'Lear GV Moderate', p: 30, c: 'bf-lear' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '22.00', bench: '20.89' },
+        { label: '3-Year Ann. Return',   port: '18.14', bench: '18.94' },
+        { label: '5-Year Ann. Return',   port: '9.95',  bench: '9.83' },
+        { label: '10-Year Ann. Return',  port: '10.14', bench: '10.67' },
+        { label: 'Ann. Volatility',      port: '11.07', bench: '13.21' },
+      ],
+      vol: { p: '11.07', b: '13.21' },
+      posPct: '75.6',
+      maxDD: { p: '-19.72%', b: '-25.15%' },
+      dd:  [{ d: '-19.72%', dt: '2021-12 to 2022-09' }, { d: '-13.69%', dt: '2020-01 to 2020-03' }, { d: '-11.98%', dt: '2015-05 to 2016-02' }],
+      bdd: [{ d: '-25.15%', dt: '2021-12 to 2022-09' }, { d: '-19.62%', dt: '2019-12 to 2020-03' }, { d: '-13.28%', dt: '2018-01 to 2018-12' }],
+      summary: 'A compelling combination of competitive returns and superior risk management. Auour\'s disciplined approach primarily focuses on quality of returns — notably mitigating large drawdowns and enhancing downside resilience. Consistently lower volatility and significantly shallower market corrections during stressed periods offer a smoother investment journey, while 5-year returns outpace the benchmark with lower realized risk.'
+    },
+    {
+      num: 'P · 07', name: 'Conservative Growth',
+      objClass: 'accum', obj: 'Accumulation · Ages 35–55',
+      sub: '50% Auour Global Equity / 50% Auour Global Balanced',
+      assetSplit: '~80% Equity / ~20% Fixed Income', growth: '$2,368,492',
+      allocs: [{ l: 'Auour Global Equity', p: 50, c: 'bf-au' }, { l: 'Auour Global Balanced', p: 50, c: 'bf-au2' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '15.65', bench: '19.31' },
+        { label: '3-Year Ann. Return',   port: '14.61', bench: '17.05' },
+        { label: '5-Year Ann. Return',   port: '7.78',  bench: '8.35' },
+        { label: '10-Year Ann. Return',  port: '8.00',  bench: '9.55' },
+        { label: 'Ann. Volatility',      port: '8.50',  bench: '12.04' },
+      ],
+      vol: { p: '8.50', b: '12.04' },
+      posPct: '79.5',
+      maxDD: { p: '-17.66%', b: '-24.51%' },
+      dd:  [{ d: '-17.66%', dt: '2021-12 to 2022-09' }, { d: '-9.12%',  dt: '2019-12 to 2020-03' }, { d: '-7.84%',  dt: '2018-01 to 2018-12' }],
+      bdd: [{ d: '-24.51%', dt: '2021-12 to 2022-09' }, { d: '-17.41%', dt: '2019-12 to 2020-03' }, { d: '-11.97%', dt: '2018-01 to 2018-12' }],
+      summary: 'Designed to deliver a more resilient and consistent investment experience for accumulators. Significantly lower annualized volatility — 3.5 percentage points below the benchmark — and a notable reduction in downside exposure across market conditions. The portfolio\'s largest historical drawdown was approximately 6.8 percentage points shallower than the benchmark\'s, consistent with Auour\'s core strength in mitigating significant losses and keeping investors committed to their long-term plan.'
+    },
+    {
+      num: 'P · 08', name: 'Balanced Growth',
+      objClass: 'accum', obj: 'Accumulation · Ages 35–55',
+      sub: '75% Auour Global Equity / 25% Lear GV Moderate',
+      assetSplit: '~93% Equity / ~7% Fixed Income', growth: '$2,655,038',
+      allocs: [{ l: 'Auour Global Equity', p: 75, c: 'bf-au' }, { l: 'Lear GV Moderate', p: 25, c: 'bf-lear' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '21.29', bench: '21.04' },
+        { label: '3-Year Ann. Return',   port: '17.98', bench: '19.11' },
+        { label: '5-Year Ann. Return',   port: '9.95',  bench: '9.97' },
+        { label: '10-Year Ann. Return',  port: '10.07', bench: '10.78' },
+        { label: 'Ann. Volatility',      port: '11.00', bench: '13.32' },
+      ],
+      vol: { p: '11.00', b: '13.32' },
+      posPct: '76.4',
+      maxDD: { p: '-19.70%', b: '-25.21%' },
+      dd:  [{ d: '-19.70%', dt: '2021-12 to 2022-09' }, { d: '-13.48%', dt: '2020-01 to 2020-03' }, { d: '-11.76%', dt: '2015-05 to 2016-02' }],
+      bdd: [{ d: '-25.21%', dt: '2021-12 to 2022-09' }, { d: '-19.81%', dt: '2019-12 to 2020-03' }, { d: '-13.40%', dt: '2018-01 to 2018-12' }],
+      summary: 'Competitive long-term return potential closely aligning with the blended benchmark — achieved with notably superior quality of return. Lower annualized volatility and a higher percentage of positive rolling 12-month periods indicate a more stable and consistent investment experience. Significantly improved downside resilience with substantially shallower peak-to-trough drawdowns, with maximum decline approximately 5.5 percentage points less severe than the benchmark.'
+    },
+    {
+      num: 'P · 09', name: 'Aggressive Growth',
+      objClass: 'accum', obj: 'Accumulation · Ages 35–55',
+      sub: '50% Auour Global Equity / 50% Lear GV Moderate',
+      assetSplit: '~85% Equity / ~15% Fixed Income', growth: '$2,634,123',
+      allocs: [{ l: 'Auour Global Equity', p: 50, c: 'bf-au' }, { l: 'Lear GV Moderate', p: 50, c: 'bf-lear' }],
+      bench: 'Blended Benchmark',
+      returns: [
+        { label: '1-Year Return',        port: '24.87', bench: '20.03' },
+        { label: '3-Year Ann. Return',   port: '18.78', bench: '17.90' },
+        { label: '5-Year Ann. Return',   port: '9.92',  bench: '9.02' },
+        { label: '10-Year Ann. Return',  port: '10.39', bench: '10.06' },
+        { label: 'Ann. Volatility',      port: '11.41', bench: '12.57' },
+      ],
+      vol: { p: '11.41', b: '12.57' },
+      posPct: '74.0',
+      maxDD: { p: '-20.10%', b: '-24.80%' },
+      dd:  [{ d: '-20.10%', dt: '2021-10 to 2022-09' }, { d: '-14.51%', dt: '2020-01 to 2020-03' }, { d: '-12.89%', dt: '2015-05 to 2016-02' }],
+      bdd: [{ d: '-24.80%', dt: '2021-12 to 2022-09' }, { d: '-18.42%', dt: '2019-12 to 2020-03' }, { d: '-12.57%', dt: '2018-01 to 2018-12' }],
+      summary: 'Consistently delivered competitive returns, surpassing its benchmark across all measured periods from one to ten years — with demonstrably lower annualized volatility, indicating a more efficient and higher-quality return profile. Significantly shallower drawdowns during periods of market stress — maximum decline approximately 4.7 percentage points less severe than the benchmark — notably mitigate the depth of the largest market declines while still capturing meaningful upside.'
+    }
+  ];
+
+  const badgeCls = { income: 'db-income', protection: 'db-protection', accum: 'db-accum' };
+
+  function showDetail(i) {
+    const p = PORTFOLIOS[i];
+    const volDiff = (parseFloat(p.vol.b) - parseFloat(p.vol.p)).toFixed(2);
+
+    const allocHTML = p.allocs.map(a => `
+      <div class="ab-row">
+        <span class="ab-lbl">${a.l}</span>
+        <div class="ab-track"><div class="ab-fill ${a.c}" style="width:${a.p}%"></div></div>
+        <span class="ab-pct">${a.p}%</span>
+      </div>`).join('');
+
+    const retHTML = p.returns.map(r => {
+      const isVol = r.label.includes('Volatility');
+      const outperforms = isVol
+        ? parseFloat(r.port) < parseFloat(r.bench)
+        : parseFloat(r.port) >= parseFloat(r.bench);
+      const cls = outperforms ? 'up' : '';
+      return `
+        <div class="perf-row">
+          <span class="pr-metric">${r.label}</span>
+          <span class="pr-port ${cls}">${r.port}%</span>
+          <span class="pr-bench">${r.bench}%</span>
+        </div>`;
+    }).join('');
+
+    const ddHTML = p.dd.map(d => `
+      <div class="dd-row">
+        <span class="dd-dec">${d.d}</span>
+        <span class="dd-date">${d.dt}</span>
+      </div>`).join('');
+
+    const bddHTML = p.bdd.map(d => `
+      <div class="dd-row">
+        <span class="dd-dec muted">${d.d}</span>
+        <span class="dd-date">${d.dt}</span>
+      </div>`).join('');
+
+    document.getElementById('detail-content').innerHTML = `
+      <div class="det-header">
+        <button class="back-btn" onclick="goBack()">← All Portfolios</button>
+        <div class="det-hdr-info">
+          <div class="det-num">${p.num}</div>
+          <div class="det-title">${p.name}</div>
+          <span class="det-badge ${badgeCls[p.objClass]}">${p.obj}</span>
+        </div>
+      </div>
+
+      <div class="det-body">
+
+        <div class="alloc-strip">
+          <div class="strip-title">Portfolio Allocation</div>
+          <div class="alloc-bars">${allocHTML}</div>
+          <div class="asset-meta">
+            <span class="meta-item">Asset mix: <span class="meta-val">${p.assetSplit}</span></span>
+            <span class="meta-item">Growth of $1M (10-year): <span class="meta-val">${p.growth}</span></span>
+            <span class="meta-item">Benchmark: <span class="meta-val">${p.bench}</span></span>
+          </div>
+        </div>
+
+        <div class="highlights">
+          <div class="hl-card">
+            <div class="hl-label">Annualized Volatility</div>
+            <div class="hl-val">${p.vol.p}%</div>
+            <div class="hl-bench">Benchmark: ${p.vol.b}%</div>
+            <div class="hl-diff">−${volDiff}% lower than benchmark</div>
+          </div>
+          <div class="hl-card">
+            <div class="hl-label">Positive Rolling Periods</div>
+            <div class="hl-val">${p.posPct}%</div>
+            <div class="hl-bench">Rolling 12-month periods</div>
+          </div>
+          <div class="hl-card">
+            <div class="hl-label">Max Drawdown</div>
+            <div class="hl-val red">${p.maxDD.p}</div>
+            <div class="hl-bench">Benchmark: ${p.maxDD.b}</div>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="mc-title">Performance vs Benchmark</div>
+            <div class="perf-head">
+              <div class="ph-cell" style="text-align:left">Metric</div>
+              <div class="ph-cell">Portfolio</div>
+              <div class="ph-cell">${p.bench}</div>
+            </div>
+            ${retHTML}
+          </div>
+
+          <div class="metric-card">
+            <div class="mc-title">Largest Drawdowns — Portfolio</div>
+            <div class="dd-head">
+              <div class="dd-hc">Decline</div>
+              <div class="dd-hc">Period</div>
+            </div>
+            ${ddHTML}
+            <div class="bench-section">
+              <div class="bench-label">Benchmark — ${p.bench}</div>
+              <div class="dd-head">
+                <div class="dd-hc">Decline</div>
+                <div class="dd-hc">Period</div>
+              </div>
+              ${bddHTML}
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="strip-title">Portfolio Summary</div>
+          <div class="sum-text">${p.summary}</div>
+        </div>
+
+        <div class="disclosure">
+          This proposal is for discussion purposes only. Past performance is not indicative of future results. The opinions expressed are those of Auour Investments, Inc. and are subject to change at any time. This information is not a solicitation for investment and does not constitute investment advice. There is no guarantee that a diversified portfolio will outperform a non-diversified portfolio in any given market environment. No investment strategy, such as asset allocation, can guarantee a profit or protect against loss in periods of declining values. Stock prices can decline significantly in response to adverse market conditions, company-specific events, and other domestic and international political and economic developments. For more complete information about the various investment solutions and the fees associated with them, please refer to the Disclosure Brochure, which you can obtain from your financial advisor. For use with Financial Advisors only. Not for use with clients.
+        </div>
+
+      </div>`;
+
+    document.getElementById('page-landing').classList.remove('active');
+    document.getElementById('page-detail').classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function goBack() {
+    document.getElementById('page-detail').classList.remove('active');
+    document.getElementById('page-landing').classList.add('active');
+    window.scrollTo(0, 0);
+  }
+</script>
+
+</body>
+</html>

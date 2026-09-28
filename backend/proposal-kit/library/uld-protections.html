@@ -1,0 +1,44 @@
+<p class="it" style="font-size:10.2pt;color:var(--navy);margin-bottom:7px">ULD is not a bank deposit and is not FDIC insured. Its protections come from how the assets are owned, held and diversified, and from how the strategy manages risk.</p>
+<div style="display:grid;grid-template-columns:1fr 1px 1.15fr;gap:18px">
+  <div>
+    <div class="lab g" style="margin-bottom:6px">How the Assets Are Held</div>
+    <div class="card" style="margin-bottom:7px"><h3>You own the positions</h3><div class="small">ULD holds ETF shares in the client's own account. They are not assets of Auour and do not sit on Auour's balance sheet.</div></div>
+    <div class="card" style="margin-bottom:7px"><h3>Fund assets kept separate</h3><div class="small">Each ETF's underlying securities are held by a custodian, apart from the fund sponsor's own assets.</div></div>
+    <div class="card"><h3>An owner, not a creditor</h3><div class="small">A bank depositor is a creditor of the bank. A ULD investor owns the underlying investment positions.</div></div>
+  </div>
+  <div style="background:var(--c1)"></div>
+  <div>
+    <div class="lab g" style="margin-bottom:6px">Underlying ETF Issuers</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><div class="chip">Invesco</div><div class="chip">Vanguard</div><div class="chip">PGIM</div><div class="chip">Janus Henderson</div><div class="chip">Franklin</div><div class="chip">DoubleLine</div><div class="chip">First Trust</div><div class="chip">Eldridge</div></div>
+    <div class="lab g" style="margin:12px 0 6px">Custody &amp; Protection</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:4px"><div class="chip">BNY Mellon &middot; Pershing</div><div class="chip">SIPC</div></div>
+    <div class="small" style="margin-top:8px">SIPC protects securities and cash up to $500,000 (including $250,000 for cash) if a member brokerage firm fails. It does not protect against market losses.</div>
+    <p class="it" style="margin:10px 0 0;border-left:3px solid var(--gold);padding-left:10px">Exposure spread across established managers, a custodian and SIPC coverage &mdash; not a single bank balance sheet.</p>
+  </div>
+</div>
+<div style="border-top:3px solid var(--rule);margin-top:12px;padding-top:8px">
+  <div style="font-size:14pt;font-weight:700;color:var(--navy);letter-spacing:.02em">RISK VS. REWARD: YIELD ISN'T THE WHOLE STORY</div>
+  <p style="margin:3px 0 1px">A modest yield pickup can come with an outsized increase in drawdown risk. ULD aims to capture competitive yield without that tradeoff.</p>
+  <div class="small it" style="margin-bottom:6px">All figures as of / through {{ reference.characteristics.asOf }}.</div>
+  <div style="border:1px solid var(--c1);padding:6px 0">
+    <div style="display:flex;gap:18px;padding:0 10px 4px" class="small"><span><span style="display:inline-block;width:9px;height:9px;background:var(--deep);margin-right:5px"></span>Current Yield</span><span><span style="display:inline-block;width:9px;height:9px;background:var(--red);margin-right:5px"></span>10-Yr Max Drawdown</span></div>
+    {% for row in reference.protections.rows %}
+    <div style="display:grid;grid-template-columns:1fr 1px 1fr;gap:14px;padding:4.5px 10px;{% if row.highlight %}background:var(--c2);{% endif %}">
+<div><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="color:var(--navy)">{{ row.label }}</b><b style="color:var(--navy)">{{ row.yieldDisplay }}</b></div>
+<div class="trk"><span style="width:{{ row.yieldBar }}"></span></div></div>
+<div style="background:var(--c1)"></div>
+<div><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="small" style="color:var(--slate)">10-Yr Max Drawdown</span><b class="neg">{{ row.drawdownDisplay }}</b></div>
+<div class="trk r"><span style="width:{{ row.drawdownBar }}"></span></div></div></div>
+    {% endfor %}
+  </div>
+</div>
+<div class="deep" style="margin-top:10px;padding:11px 20px 12px;text-align:center">
+  <div class="lab g">What This Means for the Client</div>
+  <div style="width:.5in;height:1.5px;background:var(--gold);margin:5px auto 7px"></div>
+  <div style="font-size:12.5pt">The highest current yield in this comparison, with the shallowest drawdown.</div>
+  <div style="display:grid;grid-template-columns:1fr 1px 1fr;gap:20px;margin-top:6px;align-items:center">
+    <div><div class="big" style="font-size:24pt">{{ reference.characteristics.grossYieldDisplay }}</div><div class="small" style="color:#c9d5e3">ULD current gross yield</div></div>
+    <div style="background:#3a5270;height:.38in"></div>
+    <div><div class="big" style="font-size:24pt">{{ reference.composite.stats.maxDrawdownSinceInception }}</div><div class="small" style="color:#c9d5e3">ULD max drawdown</div></div>
+  </div>
+</div>

@@ -140,6 +140,33 @@ class ApiService {
     });
   }
 
+  // Strategies Overview
+  async fetchStrategiesOverview(strategies: { strategyName: string; tickers: { ticker: string; weight: number }[] }[]) {
+    return this.request('/strategies-overview', {
+      method: 'POST',
+      body: JSON.stringify({ strategies }),
+    });
+  }
+
+  async downloadUldProposal(payload: unknown): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/proposals/uld-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      let message = 'Failed to render the Ultra Low Duration proposal';
+      try {
+        const body = await response.json();
+        message = body.message || body.error || message;
+      } catch {
+        message = response.statusText || message;
+      }
+      throw new Error(message);
+    }
+    return response.blob();
+  }
+
   // Secondary Portfolio
   async fetchSecondaryPortfolioReturns(tickers: { ticker: string; weight: number }[], primaryReturnsDateRange: { startDate: string; endDate: string }) {
     const weights = tickers.map(t => t.weight);

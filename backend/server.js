@@ -3,29 +3,37 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { query, isSQLite, isInitialized } from './database.js';
 import { randomUUID } from 'crypto';
+import { renderUldPdf } from './proposal-kit/renderProposal.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+const defaultCorsOrigins = [
+  'https://frontend-559675342331.us-central1.run.app',
+  'https://frontend-phd2mjs6qa-uc.a.run.app',
+  'https://auourproposal.com',
+  'https://www.auourproposal.com',
+  'http://localhost:5173'
+];
+const extraCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowedOrigins = [...defaultCorsOrigins, ...extraCorsOrigins];
+
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (e.g. same-origin tooling, curl)
     if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'https://frontend-559675342331.us-central1.run.app',
-      'https://frontend-phd2mjs6qa-uc.a.run.app',
-      'http://localhost:5173'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for now to debug
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    console.warn('CORS blocked origin:', origin);
+    callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true
 }));
@@ -102,7 +110,8 @@ app.get('/api/strategies', async (req, res) => {
       id: row.id,
       name: row.name,
       returns: isSQLite() ? JSON.parse(row.returns) : row.returns,
-      assetAllocation: isSQLite() ? JSON.parse(row.asset_allocation) : row.asset_allocation
+      assetAllocation: isSQLite() ? JSON.parse(row.asset_allocation) : row.asset_allocation,
+      linkedPdfData: row.linked_pdf_data || null
     }));
     res.json(strategies);
   } catch (error) {
@@ -114,7 +123,10 @@ app.get('/api/strategies', async (req, res) => {
 // Get single strategy
 app.get('/api/strategies/:id', async (req, res) => {
   try {
-    const result = await query('SELECT * FROM strategies WHERE id = ?', [req.params.id]);
+    const fetchSql = isSQLite()
+      ? 'SELECT * FROM strategies WHERE id = ?'
+      : 'SELECT * FROM strategies WHERE id = $1';
+    const result = await query(fetchSql, [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Strategy not found' });
     }
@@ -123,7 +135,8 @@ app.get('/api/strategies/:id', async (req, res) => {
       id: row.id,
       name: row.name,
       returns: isSQLite() ? JSON.parse(row.returns) : row.returns,
-      assetAllocation: isSQLite() ? JSON.parse(row.asset_allocation) : row.asset_allocation
+      assetAllocation: isSQLite() ? JSON.parse(row.asset_allocation) : row.asset_allocation,
+      linkedPdfData: row.linked_pdf_data || null
     });
   } catch (error) {
     console.error('Error fetching strategy:', error);
@@ -166,27 +179,36 @@ app.post('/api/strategies', async (req, res) => {
 // Update strategy
 app.put('/api/strategies/:id', async (req, res) => {
   try {
-    const { name, returns, assetAllocation } = req.body;
+    const { name, returns, assetAllocation, linkedPdfData } = req.body;
     
     const sql = isSQLite()
-      ? 'UPDATE strategies SET name = ?, returns = ?, asset_allocation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-      : 'UPDATE strategies SET name = $1, returns = $2, asset_allocation = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *';
+      ? 'UPDATE strategies SET name = ?, returns = ?, asset_allocation = ?, linked_pdf_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+      : 'UPDATE strategies SET name = $1, returns = $2, asset_allocation = $3, linked_pdf_data = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *';
     
     const params = isSQLite()
-      ? [name, JSON.stringify(returns), JSON.stringify(assetAllocation), req.params.id]
-      : [name, JSON.stringify(returns), JSON.stringify(assetAllocation), req.params.id];
+      ? [name, JSON.stringify(returns), JSON.stringify(assetAllocation), linkedPdfData ?? null, req.params.id]
+      : [name, JSON.stringify(returns), JSON.stringify(assetAllocation), linkedPdfData ?? null, req.params.id];
     
     const result = await query(sql, params);
-    
-    if (isSQLite() && result.rowCount === 0) {
+
+    if ((isSQLite() && result.rowCount === 0) || (!isSQLite() && (!result.rowCount || !result.rows?.[0]))) {
       return res.status(404).json({ error: 'Strategy not found' });
     }
-    
+
+    let row = result.rows?.[0];
+    if (isSQLite() && !row) {
+      const fetchResult = await query('SELECT * FROM strategies WHERE id = ?', [req.params.id]);
+      row = fetchResult.rows?.[0];
+      if (!row) {
+        return res.status(404).json({ error: 'Strategy not found' });
+      }
+    }
     res.json({ 
       id: req.params.id, 
-      name, 
-      returns, 
-      assetAllocation 
+      name: row?.name ?? name, 
+      returns: row ? (isSQLite() ? JSON.parse(row.returns) : row.returns) : returns, 
+      assetAllocation: row ? (isSQLite() ? JSON.parse(row.asset_allocation) : row.asset_allocation) : assetAllocation,
+      linkedPdfData: row ? (row.linked_pdf_data ?? null) : (linkedPdfData ?? null)
     });
   } catch (error) {
     console.error('Error updating strategy:', error);
@@ -380,6 +402,23 @@ app.post('/api/proposals', async (req, res) => {
   } catch (error) {
     console.error('Error creating proposal:', error);
     res.status(500).json({ error: 'Failed to create proposal' });
+  }
+});
+
+// Ultra Low Duration proposal PDF. Composite and GIPS figures come from proposal-kit/data_proposal.js.
+app.post('/api/proposals/uld-pdf', async (req, res) => {
+  try {
+    const pdf = await renderUldPdf(req.body || {});
+    const clientName = String(req.body?.client?.name || 'proposal')
+      .replace(/[\r\n"<>:/\\|?*]/g, '')
+      .trim()
+      .slice(0, 80) || 'proposal';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${clientName}-uld-proposal.pdf"`);
+    res.send(pdf);
+  } catch (error) {
+    console.error('Error rendering ULD proposal:', error);
+    res.status(error?.statusCode || 500).json({ error: 'Failed to render ULD proposal', message: error?.message });
   }
 });
 
@@ -623,15 +662,15 @@ app.get('/api/page-library/:id', async (req, res) => {
 // Create page in library
 app.post('/api/page-library', async (req, res) => {
   try {
-    const { id, name, page_data, position_type } = req.body;
+    const { id, name, page_data, position_type: rawPositionType } = req.body;
     
-    if (!name || !page_data || !position_type) {
-      return res.status(400).json({ error: 'Missing required fields: name, page_data, position_type' });
+    if (!name || !page_data) {
+      return res.status(400).json({ error: 'Missing required fields: name, page_data' });
     }
     
-    if (position_type !== 'before' && position_type !== 'after') {
-      return res.status(400).json({ error: 'position_type must be "before" or "after"' });
-    }
+    const position_type = (rawPositionType === 'before' || rawPositionType === 'after')
+      ? rawPositionType
+      : 'before';
     
     const pageId = id || randomUUID();
     

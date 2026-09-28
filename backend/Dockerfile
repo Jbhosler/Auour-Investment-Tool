@@ -1,7 +1,15 @@
 # Investment Proposal Tool - Backend Dockerfile
 # This builds a production-ready Node.js backend container
 
-FROM node:18-alpine
+FROM node:18-bookworm-slim
+
+# Chromium prints the ULD proposal. TeX Gyre Pagella is the deck's typeface.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      chromium \
+      fonts-texgyre \
+      ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Set working directory
 WORKDIR /app

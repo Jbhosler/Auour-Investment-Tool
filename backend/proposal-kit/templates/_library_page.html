@@ -1,0 +1,3 @@
+{# Wrapper that gives a static library fragment the standard page chrome. #}
+{% import "_base.html" as b with context %}
+{% call b.page(page_number, meta.title, meta.subtitle, meta.footnote, meta.footnote_class|default('')) %}{% include meta.file %}{% endcall %}

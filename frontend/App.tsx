@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Strategy, Benchmark, ReportData, Allocation, PerformanceMetrics, MonthlyReturn, AssetAllocation, Account, SecondaryPortfolioTicker } from './types';
-import { blendPortfolios, calculateMetrics, getLatestYearEndMonth, calculateRollingReturns, computeUnifiedRollingDistribution, calculatePlatformFeeFromWaterfall } from './services/performanceCalculator';
+import { blendPortfolios, blendUploadedGrossReturns, calculateMetrics, intersectTwoMonthlySeries, calculateRollingReturns, computeUnifiedRollingDistribution, calculatePlatformFeeFromWaterfall, buildManualSecondaryPortfolioMetrics } from './services/performanceCalculator';
 import { apiService } from './services/apiService';
 import { useApiState, useSettingsState } from './hooks/useApiState';
 import StrategySelector from './components/StrategySelector';
@@ -89,14 +89,6 @@ const App: React.FC = () => {
         return currentAccount.benchmarkAllocations.reduce((sum, alloc) => sum + (alloc.weight || 0), 0);
     }, [currentAccount]);
 
-    const benchmarkMetricsMap = useMemo(() => {
-        const map = new Map<string, PerformanceMetrics>();
-        benchmarks.forEach(b => {
-            map.set(b.id, calculateMetrics(b.returns));
-        });
-        return map;
-    }, [benchmarks]);
-    
     // Helper function to update an account
     const updateAccount = useCallback((accountId: string, updates: Partial<Account>) => {
         setAccounts(prev => prev.map(acc => acc.id === accountId ? { ...acc, ...updates } : acc));
@@ -237,10 +229,7 @@ const App: React.FC = () => {
             : calculatePlatformFeeFromWaterfall(investmentAmountNum);
         
         const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum, platformFeeNum);
-        const portfolioMetrics = calculateMetrics(portfolioReturns);
-        const portfolioVolatility = portfolioMetrics.volatility;
-
-        if (portfolioVolatility === null || benchmarks.length === 0) {
+        if (!portfolioReturns.length || benchmarks.length === 0) {
             lastProcessedState.current = stateKey;
             return;
         }
@@ -248,14 +237,16 @@ const App: React.FC = () => {
         let bestFitBenchmarkId: string | null = null;
         let minVolatilityDiff = Infinity;
 
-        benchmarks.forEach(benchmark => {
-            const benchMetrics = benchmarkMetricsMap.get(benchmark.id);
-            if (benchMetrics?.volatility !== null) {
-                const diff = Math.abs(portfolioVolatility - benchMetrics.volatility!);
-                if (diff < minVolatilityDiff) {
-                    minVolatilityDiff = diff;
-                    bestFitBenchmarkId = benchmark.id;
-                }
+        benchmarks.forEach((benchmark) => {
+            const [pa, ba] = intersectTwoMonthlySeries(portfolioReturns, benchmark.returns);
+            if (!pa.length) return;
+            const portfolioVolatility = calculateMetrics(pa).volatility;
+            const benchVolatility = calculateMetrics(ba).volatility;
+            if (portfolioVolatility === null || benchVolatility === null) return;
+            const diff = Math.abs(portfolioVolatility - benchVolatility);
+            if (diff < minVolatilityDiff) {
+                minVolatilityDiff = diff;
+                bestFitBenchmarkId = benchmark.id;
             }
         });
 
@@ -264,7 +255,7 @@ const App: React.FC = () => {
         }
         
         lastProcessedState.current = stateKey;
-    }, [currentAccount?.id, currentAccount?.portfolioAllocations, currentAccount?.selectedBenchmarkId, currentAccount?.adviserFee, currentAccount?.platformFee, currentAccount?.platformFeeManualOverride, currentAccount?.investmentAmount, totalAllocation, strategies, benchmarks, benchmarkMetricsMap, updateAccount]);
+    }, [currentAccount?.id, currentAccount?.portfolioAllocations, currentAccount?.selectedBenchmarkId, currentAccount?.adviserFee, currentAccount?.platformFee, currentAccount?.platformFeeManualOverride, currentAccount?.investmentAmount, totalAllocation, strategies, benchmarks, updateAccount]);
     
     // Track last benchmark validation to prevent loops
     const lastBenchmarkValidation = useRef<{
@@ -397,15 +388,29 @@ const App: React.FC = () => {
 
         // Validate secondary portfolio if enabled
         if (currentAccount.enableSecondaryPortfolio) {
-            const secondaryTickers = currentAccount.secondaryPortfolioTickers || [];
-            if (secondaryTickers.length === 0) {
-                alert("Please add at least one ticker to the secondary portfolio.");
-                return;
-            }
-            const secondaryTotalWeight = secondaryTickers.reduce((sum, t) => sum + (t.weight || 0), 0);
-            if (Math.abs(secondaryTotalWeight - 100) > 0.01) {
-                alert(`Secondary portfolio weights must total 100% (current: ${secondaryTotalWeight.toFixed(2)}%).`);
-                return;
+            const mode = currentAccount.secondaryPortfolioMode || 'tickers';
+            if (mode === 'tickers') {
+                const secondaryTickers = currentAccount.secondaryPortfolioTickers || [];
+                if (secondaryTickers.length === 0) {
+                    alert("Please add at least one ticker to the secondary portfolio.");
+                    return;
+                }
+                const secondaryTotalWeight = secondaryTickers.reduce((sum, t) => sum + (t.weight || 0), 0);
+                if (Math.abs(secondaryTotalWeight - 100) > 0.01) {
+                    alert(`Secondary portfolio weights must total 100% (current: ${secondaryTotalWeight.toFixed(2)}%).`);
+                    return;
+                }
+            } else {
+                const manual = currentAccount.secondaryPortfolioManual;
+                if (!manual?.name?.trim()) {
+                    alert("Please enter a name for the manual secondary portfolio.");
+                    return;
+                }
+                const hasAnyReturn = manual.returns1Y != null || manual.returns3Y != null || manual.returns5Y != null || manual.returns10Y != null;
+                if (!hasAnyReturn) {
+                    alert("Please enter at least one return (1, 3, 5, or 10 year) for the manual secondary portfolio.");
+                    return;
+                }
             }
         }
 
@@ -419,7 +424,7 @@ const App: React.FC = () => {
         });
 
         // Use benchmark allocations if available, otherwise fall back to selectedBenchmarkId
-        let benchmarkReturns: MonthlyReturn[];
+        let benchmarkReturnsRaw: MonthlyReturn[];
         let benchmarkName: string;
         
         if (currentAccount.benchmarkAllocations.length > 0) {
@@ -431,7 +436,7 @@ const App: React.FC = () => {
                     weight: alloc.weight / 100
                 };
             });
-            benchmarkReturns = blendPortfolios(selectedBenchmarks);
+            benchmarkReturnsRaw = blendUploadedGrossReturns(selectedBenchmarks);
             // Create a combined name for blended benchmarks
             benchmarkName = currentAccount.benchmarkAllocations.length === 1 
                 ? benchmarks.find(b => b.id === currentAccount.benchmarkAllocations[0].strategyId)?.name || 'Benchmark'
@@ -443,7 +448,7 @@ const App: React.FC = () => {
                 alert("Please select a benchmark.");
                 return;
             }
-            benchmarkReturns = benchmark.returns;
+            benchmarkReturnsRaw = benchmark.returns;
             benchmarkName = benchmark.name;
         }
 
@@ -453,52 +458,116 @@ const App: React.FC = () => {
         const platformFeeNum = currentAccount.platformFeeManualOverride
             ? (parseFloat(currentAccount.platformFee) || 0)
             : calculatePlatformFeeFromWaterfall(investmentAmountNum);
-        
-        // Apply adviser and platform fees to portfolio returns (but not benchmark - benchmarks are already net of their fees)
-        const portfolioReturns = blendPortfolios(selectedStrategies, adviserFeeNum, platformFeeNum);
+
+        const portfolioBlend = blendPortfolios(selectedStrategies, adviserFeeNum, platformFeeNum);
+        if (!portfolioBlend.length) {
+            alert(
+                'No overlapping monthly return history across portfolio strategies (each sleeve must include the same calendar months within the overlapping window). Extend or align strategy data.'
+            );
+            return;
+        }
+
+        let portfolioReturns: MonthlyReturn[];
+        let benchmarkReturns: MonthlyReturn[];
+        [portfolioReturns, benchmarkReturns] = intersectTwoMonthlySeries(portfolioBlend, benchmarkReturnsRaw);
+        if (!portfolioReturns.length) {
+            alert(
+                'No overlapping monthly returns between this portfolio blend and the benchmark. Use a benchmark with overlapping history or extend data.'
+            );
+            return;
+        }
+
+        const grossByDate = new Map(blendUploadedGrossReturns(selectedStrategies).map((r) => [r.date, r]));
+        let portfolioGrossReturns = portfolioReturns
+            .map((r) => grossByDate.get(r.date))
+            .filter((r): r is MonthlyReturn => r != null);
+
+        if (portfolioGrossReturns.length !== portfolioReturns.length) {
+            alert('Unable to align gross portfolio returns with the net series. Report generation stopped.');
+            return;
+        }
+
         const annualDistributionNum = parseFloat(currentAccount.annualDistribution) || 0;
         const clientAgeNum = parseFloat(currentAccount.clientAge) || 0;
-        const asOfYearEnd = getLatestYearEndMonth(portfolioReturns);
-        const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd);
-        const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd);
 
-        // Fetch secondary portfolio returns if enabled (reuse cached returns when tickers and date range unchanged)
-        let secondaryPortfolioMetrics: (PerformanceMetrics & { name: string }) | undefined;
+        // Fetch or align secondary ticker returns before calculating metrics so all windows match
+        let secondaryPortfolioMetrics: (PerformanceMetrics & { name: string; isManualOnly?: boolean }) | undefined;
         let secondaryReturns: MonthlyReturn[] | undefined;
-        if (currentAccount.enableSecondaryPortfolio && currentAccount.secondaryPortfolioTickers && currentAccount.secondaryPortfolioTickers.length > 0) {
-            if (portfolioReturns.length === 0) {
-                alert("Portfolio returns are empty.");
-                return;
-            }
-            const startDate = portfolioReturns[0].date;
-            const endDate = portfolioReturns[portfolioReturns.length - 1].date;
-            const cachedReturns = currentAccount.secondaryPortfolioReturns;
-            const cacheTickers = currentAccount.secondaryPortfolioCacheTickers;
-            const canUseCache = cachedReturns && cachedReturns.length > 0
-                && cacheTickers && secondaryTickersMatch(currentAccount.secondaryPortfolioTickers, cacheTickers)
-                && cachedReturns[0].date <= startDate && cachedReturns[cachedReturns.length - 1].date >= endDate;
+        const mode = currentAccount.secondaryPortfolioMode || 'tickers';
 
-            if (canUseCache) {
-                secondaryReturns = cachedReturns.filter(r => r.date >= startDate && r.date <= endDate);
-                secondaryPortfolioMetrics = {
-                    ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd),
-                    name: 'Secondary Portfolio'
-                };
-            } else {
+        if (currentAccount.enableSecondaryPortfolio) {
+            if (mode === 'manual' && currentAccount.secondaryPortfolioManual) {
+                if (portfolioReturns.length === 0) {
+                    alert("Portfolio returns are empty.");
+                    return;
+                }
+                const startDate = portfolioReturns[0].date;
+                const endDate = portfolioReturns[portfolioReturns.length - 1].date;
+                const manualStart = new Date(startDate + '-01');
+                manualStart.setMonth(manualStart.getMonth() - 1);
+                const growthStartDate = manualStart.toISOString().slice(0, 7);
+                secondaryPortfolioMetrics = buildManualSecondaryPortfolioMetrics(
+                    currentAccount.secondaryPortfolioManual,
+                    { startDate: growthStartDate, endDate }
+                ) ?? undefined;
+            } else if (currentAccount.secondaryPortfolioTickers && currentAccount.secondaryPortfolioTickers.length > 0) {
+                if (portfolioReturns.length === 0) {
+                    alert("Portfolio returns are empty.");
+                    return;
+                }
+                const startDate = portfolioReturns[0].date;
+                const endDate = portfolioReturns[portfolioReturns.length - 1].date;
+                const cachedReturns = currentAccount.secondaryPortfolioReturns;
+                const cacheTickers = currentAccount.secondaryPortfolioCacheTickers;
+                const canUseCache = cachedReturns && cachedReturns.length > 0
+                    && cacheTickers && secondaryTickersMatch(currentAccount.secondaryPortfolioTickers, cacheTickers)
+                    && cachedReturns[0].date <= startDate && cachedReturns[cachedReturns.length - 1].date >= endDate;
+
                 try {
-                    const secondaryResponse = await apiService.fetchSecondaryPortfolioReturns(
-                        currentAccount.secondaryPortfolioTickers,
-                        { startDate, endDate }
-                    );
-                    secondaryReturns = secondaryResponse.returns;
+                    if (canUseCache) {
+                        secondaryReturns = cachedReturns.filter(r => r.date >= startDate && r.date <= endDate);
+                    } else {
+                        const secondaryResponse = await apiService.fetchSecondaryPortfolioReturns(
+                            currentAccount.secondaryPortfolioTickers,
+                            { startDate, endDate }
+                        );
+                        secondaryReturns = secondaryResponse.returns;
+                        updateAccount(currentAccount.id, {
+                            secondaryPortfolioReturns: secondaryReturns,
+                            secondaryPortfolioCacheTickers: currentAccount.secondaryPortfolioTickers.map(t => ({ ticker: t.ticker, weight: t.weight }))
+                        });
+                    }
+
+                    const [pTrim, secondaryAligned] = intersectTwoMonthlySeries(portfolioReturns, secondaryReturns);
+                    if (!pTrim.length) {
+                        alert('No overlapping monthly returns between this portfolio blend and the secondary portfolio tickers for the report window.');
+                        return;
+                    }
+                    const bmByDate = new Map(benchmarkReturns.map((r) => [r.date, r]));
+                    portfolioReturns = pTrim;
+                    const nextBench: MonthlyReturn[] = [];
+                    for (const r of pTrim) {
+                        const bm = bmByDate.get(r.date);
+                        if (!bm) {
+                            alert('Unable to align the benchmark after matching the secondary portfolio months.');
+                            return;
+                        }
+                        nextBench.push(bm);
+                    }
+                    benchmarkReturns = nextBench;
+                    portfolioGrossReturns = portfolioReturns
+                        .map((r) => grossByDate.get(r.date))
+                        .filter((r): r is MonthlyReturn => r != null);
+                    if (portfolioGrossReturns.length !== portfolioReturns.length) {
+                        alert('Unable to align gross portfolio returns after matching the secondary portfolio.');
+                        return;
+                    }
+                    secondaryReturns = secondaryAligned;
+
                     secondaryPortfolioMetrics = {
-                        ...calculateMetrics(secondaryReturns, investmentAmountNum, annualDistributionNum, clientAgeNum, asOfYearEnd),
+                        ...calculateMetrics(secondaryReturns!, investmentAmountNum, annualDistributionNum, clientAgeNum),
                         name: 'Secondary Portfolio'
                     };
-                    updateAccount(currentAccount.id, {
-                        secondaryPortfolioReturns: secondaryReturns,
-                        secondaryPortfolioCacheTickers: currentAccount.secondaryPortfolioTickers.map(t => ({ ticker: t.ticker, weight: t.weight }))
-                    });
                 } catch (error: any) {
                     console.error('Error fetching secondary portfolio:', error);
                     let msg = error?.message || 'Unknown error';
@@ -512,20 +581,34 @@ const App: React.FC = () => {
             }
         }
 
+        const portfolioMetrics = calculateMetrics(portfolioReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
+        const portfolioGrossMetrics = calculateMetrics(portfolioGrossReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
+        const benchmarkMetrics = calculateMetrics(benchmarkReturns, investmentAmountNum, annualDistributionNum, clientAgeNum);
         let report: ReportData;
+        const portfolioWithGross = {
+            ...portfolioMetrics,
+            grossReturns: portfolioGrossMetrics.returns,
+            grossVolatility: portfolioGrossMetrics.volatility,
+        };
         if (secondaryPortfolioMetrics && secondaryReturns) {
             const portfolioRolling = calculateRollingReturns(portfolioReturns, 12);
             const benchmarkRolling = calculateRollingReturns(benchmarkReturns, 12);
             const secondaryRolling = calculateRollingReturns(secondaryReturns, 12);
             const unified = computeUnifiedRollingDistribution(portfolioRolling, benchmarkRolling, secondaryRolling);
             report = {
-                portfolio: { ...portfolioMetrics, name: 'Portfolio', rollingReturnsDistribution: unified.portfolio },
+                portfolio: { ...portfolioWithGross, name: 'Portfolio', rollingReturnsDistribution: unified.portfolio },
                 benchmark: { ...benchmarkMetrics, name: benchmarkName, rollingReturnsDistribution: unified.benchmark },
                 secondaryPortfolio: { ...secondaryPortfolioMetrics, rollingReturnsDistribution: unified.secondary }
             };
+        } else if (secondaryPortfolioMetrics && secondaryPortfolioMetrics.isManualOnly) {
+            report = {
+                portfolio: { ...portfolioWithGross, name: 'Portfolio' },
+                benchmark: { ...benchmarkMetrics, name: benchmarkName },
+                secondaryPortfolio: secondaryPortfolioMetrics
+            };
         } else {
             report = {
-                portfolio: { ...portfolioMetrics, name: 'Portfolio' },
+                portfolio: { ...portfolioWithGross, name: 'Portfolio' },
                 benchmark: { ...benchmarkMetrics, name: benchmarkName },
             };
         }
@@ -544,11 +627,12 @@ const App: React.FC = () => {
                 allocations: currentAccount.portfolioAllocations,
                 selected_benchmark_id: currentAccount.selectedBenchmarkId,
                 ai_summary: currentAccount.aiSummary,
-                secondary_portfolio_config: currentAccount.enableSecondaryPortfolio && currentAccount.secondaryPortfolioTickers
-                    ? {
-                        enabled: currentAccount.enableSecondaryPortfolio,
-                        tickers: currentAccount.secondaryPortfolioTickers
-                    }
+                secondary_portfolio_config: currentAccount.enableSecondaryPortfolio
+                    ? (currentAccount.secondaryPortfolioMode === 'manual' && currentAccount.secondaryPortfolioManual
+                        ? { enabled: true, mode: 'manual', manual: currentAccount.secondaryPortfolioManual }
+                        : currentAccount.secondaryPortfolioTickers?.length
+                            ? { enabled: true, mode: 'tickers', tickers: currentAccount.secondaryPortfolioTickers }
+                            : null)
                     : null
             });
         } catch (error) {
@@ -574,20 +658,21 @@ const App: React.FC = () => {
     }
 };
 
-    const handleUpdateStrategy = async (id: string, name: string, assetAllocation: AssetAllocation) => {
+    const handleUpdateStrategy = async (id: string, name: string, assetAllocation: AssetAllocation, linkedPdfData?: string | null, updatedReturns?: MonthlyReturn[]) => {
         try {
-            // Find the existing strategy to preserve returns
             const existingStrategy = strategies.find(s => s.id === id);
             if (!existingStrategy) {
                 alert('Strategy not found');
                 return;
             }
-            
-            // Update with name and assetAllocation, preserving existing returns
+
+            const returns = updatedReturns !== undefined ? updatedReturns : existingStrategy.returns;
+
             const updated = await apiService.updateStrategy(id, {
                 name,
-                returns: existingStrategy.returns, // Preserve existing returns
-                assetAllocation
+                returns,
+                assetAllocation,
+                linkedPdfData: linkedPdfData ?? existingStrategy.linkedPdfData ?? null
             });
             setStrategies(strategies.map(s => s.id === id ? { ...s, ...updated } : s));
         } catch (error) {
@@ -649,19 +734,19 @@ const App: React.FC = () => {
     }
 };
 
-    const handleUpdateBenchmark = async (id: string, name: string) => {
+    const handleUpdateBenchmark = async (id: string, name: string, updatedReturns?: MonthlyReturn[]) => {
         try {
-            // Find the existing benchmark to preserve returns
             const existingBenchmark = benchmarks.find(b => b.id === id);
             if (!existingBenchmark) {
                 alert('Benchmark not found');
                 return;
             }
-            
-            // Update with name, preserving existing returns
+
+            const returns = updatedReturns !== undefined ? updatedReturns : existingBenchmark.returns;
+
             const updated = await apiService.updateBenchmark(id, {
                 name,
-                returns: existingBenchmark.returns // Preserve existing returns
+                returns
             });
             setBenchmarks(benchmarks.map(b => b.id === id ? { ...b, ...updated } : b));
         } catch (error) {
@@ -781,6 +866,12 @@ const App: React.FC = () => {
                         <p className="text-gray-600 mt-1">Create compelling, data-driven investment proposals for your clients.</p>
                     </div>
                      <div className="flex items-center space-x-4">
+                        <a
+                            href="/fusion.html"
+                            className="px-3 py-1.5 rounded-md text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 inline-block"
+                        >
+                            Fusion
+                        </a>
                         <button
                             onClick={() => { setIsStrategiesOverview(false); }}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium ${!isStrategiesOverview ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
@@ -902,8 +993,12 @@ const App: React.FC = () => {
                                                     setPlatformFeeManualOverride={(override) => updateAccount(currentAccount.id, { platformFeeManualOverride: override })}
                                                     enableSecondaryPortfolio={currentAccount.enableSecondaryPortfolio || false}
                                                     setEnableSecondaryPortfolio={(enabled) => updateAccount(currentAccount.id, { enableSecondaryPortfolio: enabled })}
+                                                    secondaryPortfolioMode={currentAccount.secondaryPortfolioMode || 'tickers'}
+                                                    setSecondaryPortfolioMode={(mode) => updateAccount(currentAccount.id, { secondaryPortfolioMode: mode })}
                                                     secondaryPortfolioTickers={currentAccount.secondaryPortfolioTickers || []}
                                                     setSecondaryPortfolioTickers={(tickers) => updateAccount(currentAccount.id, { secondaryPortfolioTickers: tickers })}
+                                                    secondaryPortfolioManual={currentAccount.secondaryPortfolioManual}
+                                                    setSecondaryPortfolioManual={(manual) => updateAccount(currentAccount.id, { secondaryPortfolioManual: manual })}
                                                 />
                                                 <div className="bg-white p-6 rounded-lg shadow-lg">
                                                     <h2 className="text-xl font-semibold mb-4 border-b pb-2">Account: {currentAccount.accountName}</h2>
@@ -972,6 +1067,8 @@ const App: React.FC = () => {
                                                   reportData={currentAccount.reportData}
                                                   selectedBeforePageIds={settings.selected_before_page_ids || []}
                                                   selectedAfterPageIds={settings.selected_after_page_ids || []}
+                                                  portfolioAllocations={currentAccount.portfolioAllocations}
+                                                  strategies={strategies}
                                                   aiSummary={currentAccount.aiSummary}
                                                   firmLogo={settings.logo_data}
                                                   secondaryLogo={settings.secondary_logo_data}
@@ -1027,8 +1124,12 @@ const App: React.FC = () => {
                                     setPlatformFeeManualOverride={(override) => currentAccount && updateAccount(currentAccount.id, { platformFeeManualOverride: override })}
                                     enableSecondaryPortfolio={currentAccount?.enableSecondaryPortfolio || false}
                                     setEnableSecondaryPortfolio={(enabled) => currentAccount && updateAccount(currentAccount.id, { enableSecondaryPortfolio: enabled })}
+                                    secondaryPortfolioMode={currentAccount?.secondaryPortfolioMode || 'tickers'}
+                                    setSecondaryPortfolioMode={(mode) => currentAccount && updateAccount(currentAccount.id, { secondaryPortfolioMode: mode })}
                                     secondaryPortfolioTickers={currentAccount?.secondaryPortfolioTickers || []}
                                     setSecondaryPortfolioTickers={(tickers) => currentAccount && updateAccount(currentAccount.id, { secondaryPortfolioTickers: tickers })}
+                                    secondaryPortfolioManual={currentAccount?.secondaryPortfolioManual}
+                                    setSecondaryPortfolioManual={(manual) => currentAccount && updateAccount(currentAccount.id, { secondaryPortfolioManual: manual })}
                                 />
                                 {currentAccount && (
                                     <>
@@ -1091,6 +1192,8 @@ const App: React.FC = () => {
                                           reportData={currentAccount.reportData}
                                           selectedBeforePageIds={settings.selected_before_page_ids || []}
                                           selectedAfterPageIds={settings.selected_after_page_ids || []}
+                                          portfolioAllocations={currentAccount.portfolioAllocations}
+                                          strategies={strategies}
                                           aiSummary={currentAccount.aiSummary}
                                           firmLogo={settings.logo_data}
                                           secondaryLogo={settings.secondary_logo_data}

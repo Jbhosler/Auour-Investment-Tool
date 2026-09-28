@@ -31,12 +31,9 @@ const TitlePage: React.FC<TitlePageProps> = ({ firmLogo, secondaryLogo, portfoli
     };
 
     return (
-        <div className="w-full h-full flex bg-white text-gray-700 font-sans" style={{ minHeight: '297mm' }}>
-            {/* Left Accent Line - thin vertical line */}
-            <div className="w-1 bg-[#003365]" style={{ minHeight: '297mm' }}></div>
-
-            {/* Main Content Area - lighter background, better spacing for A4, ensure no clipping */}
-            <div className="flex-1 flex flex-col justify-between px-12 py-10 bg-white" style={{ minHeight: '297mm' }}>
+        <div className="w-full flex bg-white text-[#4b5563] font-sans" style={{ width: '8.5in', minHeight: '11in' }}>
+            <div className="w-1 bg-[#003365] flex-shrink-0" style={{ minHeight: '11in' }}></div>
+            <div className="flex-1 flex flex-col justify-between px-12 pt-10 pb-6 bg-white" style={{ minHeight: '11in' }}>
                 {/* Header Section - reduced height to prevent clipping */}
                 <header className="w-full flex justify-between items-start mb-4" style={{ minHeight: '60px', maxHeight: '80px' }}>
                     {/* Primary Logo - Left, Larger */}

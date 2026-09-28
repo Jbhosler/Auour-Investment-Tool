@@ -1,0 +1,117 @@
+{
+  "pages": [
+    {
+      "id": "uld-overview",
+      "file": "library/uld-overview.html",
+      "title": "Ultra Low Duration (ULD)",
+      "subtitle": "{{ reference.characteristics.asOfShort }}",
+      "footnote": "Dividends are not guaranteed to be paid and may be reduced or eliminated at any time. They are not FDIC-insured or bank guaranteed. Past performance is no guarantee of future returns, and there is no guarantee that the objective of optimal income generation can be obtained. Auour Investments is a registered investment advisor with the Securities &amp; Exchange Commission.",
+      "slot": "front",
+      "strategies": [
+        "uld"
+      ],
+      "order": 10,
+      "chrome": true,
+      "enabled": true
+    },
+    {
+      "id": "uld-model",
+      "file": "library/uld-model.html",
+      "title": "Ultra Low Duration (ULD)",
+      "subtitle": "{{ reference.characteristics.asOfShort }}",
+      "footnote": "*The current expected yield of {{ reference.characteristics.grossYieldDisplay }} is based on portfolio holdings and market conditions as of the date indicated and is not guaranteed. Expected yield is an estimate of the income the portfolio may generate over the next 12 months and may change without notice. Actual results may vary. Investing involves risk, including the possible loss of principal. Ultra-low-duration strategies seek to reduce interest rate sensitivity, but remain subject to interest rate risk, credit risk, and other fixed-income risks. Past performance is not indicative of future results. This material is for financial professional use only and should not be considered investment advice or a recommendation to buy or sell any security.<br>Dividends are not guaranteed to be paid and may be reduced or eliminated at any time. They are not FDIC-insured or bank guaranteed. Past performance is no guarantee of future returns, and there is no guarantee that the objective of optimal income generation can be obtained. Auour Investments is a registered investment advisor with the Securities &amp; Exchange Commission.",
+      "slot": "front",
+      "strategies": [
+        "uld"
+      ],
+      "order": 20,
+      "chrome": true,
+      "enabled": true,
+      "footnote_class": "tiny"
+    },
+    {
+      "id": "uld-protections",
+      "file": "library/uld-protections.html",
+      "title": "Protections &amp; Drawdowns",
+      "subtitle": "AS OF {{ reference.characteristics.asOf }}",
+      "footnote": "Short-Duration proxy: iShares 1-3 Yr Treasury ETF (SHY). Intermediate-Term proxy: iShares 7-10 Yr Treasury ETF (IEF). Long-Duration proxy: iShares 20+ Yr Treasury ETF (TLT). 30-Day SEC Yields per BlackRock fact sheets dated {{ reference.characteristics.asOf }}. 10-year maximum drawdowns per Morningstar, through {{ reference.characteristics.asOf }}. ULD gross yield and drawdown as of {{ reference.characteristics.asOf }}. Yield bars scaled to {{ reference.protections.yieldBarScale }}%; drawdown bars scaled to -{{ reference.protections.drawdownBarScale }}%. Past performance does not guarantee future results. For illustrative purposes only. Subject to change. Auour Investments is not a bank; ULD is not FDIC insured.",
+      "slot": "back",
+      "strategies": [
+        "uld"
+      ],
+      "order": 10,
+      "chrome": true,
+      "enabled": true
+    },
+    {
+      "id": "uld-factsheet",
+      "file": "library/uld-factsheet.html",
+      "title": "Ultra Low Duration",
+      "subtitle": "{{ reference.composite.periodLabel }}",
+      "footnote": "Source: Morningstar. Auour, pronounced &ldquo;Our.&rdquo;",
+      "slot": "back",
+      "strategies": [
+        "uld"
+      ],
+      "order": 20,
+      "chrome": true,
+      "enabled": true
+    },
+    {
+      "id": "uld-composite",
+      "file": "library/uld-composite.html",
+      "title": "Ultra Low Duration",
+      "subtitle": "RETURNS AS OF {{ reference.composite.periodLabel }}",
+      "footnote": "",
+      "slot": "back",
+      "strategies": [
+        "uld"
+      ],
+      "order": 30,
+      "chrome": true,
+      "enabled": true
+    },
+    {
+      "id": "risk-mitigation",
+      "file": "library/risk-mitigation.html",
+      "title": "Auour's Approach to Risk Mitigation",
+      "subtitle": "",
+      "footnote": "Confidential. For use with your financial adviser. Note: As with any investment strategy, a review of disclosures is an integral part of and should be read before investing. Past performance is no guarantee of future returns. Any investment may result in losses. Hypothetical Portfolio Analysis.",
+      "slot": "back",
+      "strategies": [
+        "*"
+      ],
+      "order": 60,
+      "chrome": true,
+      "enabled": true
+    },
+    {
+      "id": "about-auour",
+      "file": "library/about-auour.html",
+      "title": "About Auour Investments",
+      "subtitle": "",
+      "footnote": "Confidential. For use with your financial adviser. Note: As with any investment strategy, a review of disclosures is an integral part of and should be read before investing. Past performance is no guarantee of future returns. Any investment may result in losses. Hypothetical Portfolio Analysis.",
+      "slot": "back",
+      "strategies": [
+        "*"
+      ],
+      "order": 70,
+      "chrome": true,
+      "enabled": true
+    },
+    {
+      "id": "disclosures",
+      "file": "library/disclosures.html",
+      "title": "Disclosures",
+      "subtitle": "",
+      "footnote": "Confidential. For use with your financial adviser. Note: As with any investment strategy, a review of disclosures is an integral part of and should be read before investing. Past performance is no guarantee of future returns. Any investment may result in losses. Hypothetical Portfolio Analysis.",
+      "slot": "back",
+      "strategies": [
+        "*"
+      ],
+      "order": 80,
+      "chrome": true,
+      "enabled": true
+    }
+  ]
+}

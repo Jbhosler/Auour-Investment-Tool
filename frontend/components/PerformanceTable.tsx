@@ -1,12 +1,13 @@
 
 import React from 'react';
 import { PerformanceMetrics } from '../types';
+import { formatPerformanceAsOfLabel } from '../utils/performanceAsOfDisplay';
 
 interface PerformanceTableProps {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
     returnType: 'TWR' | 'IRR';
-    secondaryPortfolio?: PerformanceMetrics & { name: string };
+    secondaryPortfolio?: PerformanceMetrics & { name: string; isManualOnly?: boolean; returnsAsOf?: string | null };
 }
 
 const formatPercent = (value: number | null) => {
@@ -17,6 +18,8 @@ const formatPercent = (value: number | null) => {
 
 
 const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmark, returnType, secondaryPortfolio }) => {
+    const primaryAsOfLabel = formatPerformanceAsOfLabel(portfolio.performanceAsOf ?? benchmark.performanceAsOf);
+
     const metrics: (keyof PerformanceMetrics['returns'] | 'volatility')[] = [
         '1 Year',
         '3 Year',
@@ -35,27 +38,42 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
 
     return (
         <div>
-            <div className="mb-4 pb-2 border-b border-gray-200">
-                <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Key Performance Metrics</h4>
-                <p className="text-sm text-gray-500 mt-1" style={{ fontSize: '0.8rem' }}>Comparative analysis of portfolio vs. benchmark</p>
+            <div className="mb-3 pb-1.5 border-b border-[#f3f4f6]">
+                <h4 className="font-semibold text-[#003365] tracking-tight" style={{ fontSize: '0.9rem' }}>Key Performance Metrics</h4>
+                <p className="text-[#4b5563] mt-0.5" style={{ fontSize: '0.75rem' }}>Comparative analysis of portfolio vs. benchmark</p>
+                {primaryAsOfLabel && (
+                    <p className="text-[#4b5563] mt-0.5 font-medium" style={{ fontSize: '0.7rem' }}>
+                        As of {primaryAsOfLabel}
+                    </p>
+                )}
                 {secondaryPortfolio && (
-                    <p className="text-xs text-gray-400 mt-1" style={{ fontSize: '0.7rem' }} title="Returns sourced from Alpha Vantage; may differ slightly from Morningstar due to data source and month-end conventions.">
-                        Secondary portfolio: Alpha Vantage total return (may differ from Morningstar).
+                    <p className="text-xs text-[#4b5563] mt-0.5" style={{ fontSize: '0.65rem' }} title={secondaryPortfolio.isManualOnly ? 'Entered metrics are assumed to match your factsheet for the stated as-of date; they are not recomputed by this application.' : 'Returns sourced from Alpha Vantage; may differ slightly from Morningstar due to data source and month-end conventions.'}>
+                        {secondaryPortfolio.isManualOnly ? (
+                            <>
+                                Secondary portfolio: user-entered metrics, assumed accurate through{' '}
+                                {formatPerformanceAsOfLabel(secondaryPortfolio.returnsAsOf ?? secondaryPortfolio.performanceAsOf) ?? primaryAsOfLabel ?? 'the primary portfolio blended series end'}
+                                .
+                                They are shown as entered and not forced to match the primary portfolio statistical cutoff.
+                            </>
+                        ) : (
+                            'Secondary portfolio: Alpha Vantage total return (may differ from Morningstar).'
+                        )}
                     </p>
                 )}
             </div>
-            {/* Lighter border, no shadow for cleaner look */}
-            <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="overflow-hidden">
                 <table className="w-full text-sm text-left">
-                    {/* Lighter header - subtle gradient, reduced opacity */}
-                    <thead className="bg-gradient-to-r from-[#003365] to-[#003d6b] text-white">
+                    <thead className="bg-[#003365] text-white">
                         <tr>
-                            <th scope="col" className="px-4 py-2.5 font-medium uppercase tracking-wide" style={{ fontSize: '0.7rem' }}>Metric</th>
-                            <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={portfolio.name}>{portfolio.name}</th>
-                            {secondaryPortfolio && (
-                                <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={secondaryPortfolio.name}>{secondaryPortfolio.name}</th>
+                            <th scope="col" className="px-3 py-1.5 font-medium uppercase tracking-tight" style={{ fontSize: '0.65rem' }}>Metric</th>
+                            {portfolio.grossReturns && (
+                                <th scope="col" className="px-3 py-1.5 text-right font-medium uppercase tracking-tight truncate" style={{ fontSize: '0.65rem' }} title={`${portfolio.name} gross: blended uploaded returns (no fees)`}>{portfolio.name} (Gross)</th>
                             )}
-                            <th scope="col" className="px-4 py-2.5 text-right font-medium uppercase tracking-wide truncate" style={{ fontSize: '0.7rem' }} title={benchmark.name}>{benchmark.name}</th>
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium uppercase tracking-tight truncate" style={{ fontSize: '0.65rem' }} title={portfolio.name}>{portfolio.name} (Net)</th>
+                            {secondaryPortfolio && (
+                                <th scope="col" className="px-3 py-1.5 text-right font-medium uppercase tracking-tight truncate" style={{ fontSize: '0.65rem' }} title={secondaryPortfolio.name}>{secondaryPortfolio.name}</th>
+                            )}
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium uppercase tracking-tight truncate" style={{ fontSize: '0.65rem' }} title={`${benchmark.name} (uploaded)`}>{benchmark.name}</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
@@ -63,6 +81,9 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
                             const portfolioValue = metricKey === 'volatility' 
                                 ? portfolio.volatility 
                                 : portfolio.returns[metricKey as keyof PerformanceMetrics['returns']];
+                            const portfolioGrossValue = metricKey !== 'volatility' && portfolio.grossReturns
+                                ? portfolio.grossReturns[metricKey as keyof PerformanceMetrics['returns']]
+                                : null;
                             const benchmarkValue = metricKey === 'volatility' 
                                 ? benchmark.volatility 
                                 : benchmark.returns[metricKey as keyof PerformanceMetrics['returns']];
@@ -72,27 +93,33 @@ const PerformanceTable: React.FC<PerformanceTableProps> = ({ portfolio, benchmar
                                     : secondaryPortfolio.returns[metricKey as keyof PerformanceMetrics['returns']])
                                 : null;
                             
-                            // Determine if portfolio outperforms
                             const outperforms = portfolioValue !== null && benchmarkValue !== null && portfolioValue > benchmarkValue;
                             
                             return (
                                 <tr 
                                     key={metricKey} 
-                                    className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                    className={`border-b border-[#f3f4f6] ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'}`}
                                 >
-                                    <td className="px-4 py-3 font-medium text-gray-600" style={{ fontSize: '0.85rem' }}>{metricLabels[metricKey]}</td>
-                                    <td className={`px-4 py-3 text-right font-mono ${outperforms ? 'text-green-700 font-semibold' : 'text-gray-700'}`} style={{ fontSize: '0.85rem' }}>
+                                    <td className="px-3 py-1.5 font-medium text-[#4b5563]" style={{ fontSize: '0.8rem' }}>{metricLabels[metricKey]}</td>
+                                    {portfolio.grossReturns && (
+                                        <td className="px-3 py-1.5 text-right font-mono text-[#4b5563]" style={{ fontSize: '0.8rem' }}>
+                                            {metricKey === 'volatility'
+                                                ? formatPercent(portfolio.grossVolatility ?? portfolio.volatility)
+                                                : formatPercent(portfolioGrossValue)}
+                                        </td>
+                                    )}
+                                    <td className={`px-3 py-1.5 text-right font-mono ${outperforms ? 'text-green-700 font-semibold' : 'text-[#4b5563]'}`} style={{ fontSize: '0.8rem' }}>
                                         {metricKey === 'volatility' ? formatPercent(portfolioValue) : formatPercent(portfolioValue)}
                                         {outperforms && portfolioValue !== null && benchmarkValue !== null && (
-                                            <span className="ml-2 text-green-600" style={{ fontSize: '0.75rem' }}>↑</span>
+                                            <span className="ml-2 text-green-600" style={{ fontSize: '0.7rem' }}>↑</span>
                                         )}
                                     </td>
                                     {secondaryPortfolio && (
-                                        <td className="px-4 py-3 text-right font-mono text-gray-700" style={{ fontSize: '0.85rem' }}>
+                                        <td className="px-3 py-1.5 text-right font-mono text-[#4b5563]" style={{ fontSize: '0.8rem' }}>
                                             {metricKey === 'volatility' ? formatPercent(secondaryValue) : formatPercent(secondaryValue)}
                                         </td>
                                     )}
-                                    <td className="px-4 py-3 text-right font-mono text-gray-700" style={{ fontSize: '0.85rem' }}>
+                                    <td className="px-3 py-1.5 text-right font-mono text-[#4b5563]" style={{ fontSize: '0.8rem' }}>
                                         {metricKey === 'volatility' ? formatPercent(benchmarkValue) : formatPercent(benchmarkValue)}
                                     </td>
                                 </tr>

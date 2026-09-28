@@ -11,10 +11,10 @@ interface AdminPanelProps {
     strategies: Strategy[];
     benchmarks: Benchmark[];
     onAddStrategy: (name: string, returns: MonthlyReturn[], assetAllocation: AssetAllocation) => void;
-    onUpdateStrategy: (id: string, name: string, assetAllocation: AssetAllocation) => void;
+    onUpdateStrategy: (id: string, name: string, assetAllocation: AssetAllocation, linkedPdfData?: string | null, updatedReturns?: MonthlyReturn[]) => void;
     onDeleteStrategy: (id: string) => void;
     onAddBenchmark: (name: string, returns: MonthlyReturn[]) => void;
-    onUpdateBenchmark: (id: string, name: string) => void;
+    onUpdateBenchmark: (id: string, name: string, updatedReturns?: MonthlyReturn[]) => void;
     onDeleteBenchmark: (id: string) => void;
     selectedBeforePageIds: string[];
     selectedAfterPageIds: string[];
@@ -43,18 +43,18 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
         setModalState({ isOpen: false, type: null, itemToEdit: null });
     };
 
-    const handleSave = (data: { name: string; assetAllocation?: AssetAllocation; returns?: MonthlyReturn[] | null; }) => {
+    const handleSave = (data: { name: string; assetAllocation?: AssetAllocation; returns?: MonthlyReturn[] | null; linkedPdfData?: string | null; }) => {
         const { type, itemToEdit } = modalState;
 
         if (type === 'Strategy' && data.assetAllocation) {
             if (itemToEdit) {
-                props.onUpdateStrategy(itemToEdit.id, data.name, data.assetAllocation);
+                props.onUpdateStrategy(itemToEdit.id, data.name, data.assetAllocation, data.linkedPdfData, data.returns);
             } else if (data.returns) {
                 props.onAddStrategy(data.name, data.returns, data.assetAllocation);
             }
         } else if (type === 'Benchmark') {
             if (itemToEdit) {
-                props.onUpdateBenchmark(itemToEdit.id, data.name);
+                props.onUpdateBenchmark(itemToEdit.id, data.name, data.returns);
             } else if (data.returns) {
                 props.onAddBenchmark(data.name, data.returns);
             }

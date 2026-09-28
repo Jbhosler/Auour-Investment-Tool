@@ -42,14 +42,14 @@ spec:
             secretKeyRef:
               key: latest
               name: database-url
-        image: gcr.io/investment-proposal-prod/backend
+        image: gcr.io/investment-proposal/backend
         ports:
         - containerPort: 8080
           name: http1
         resources:
           limits:
             cpu: 1000m
-            memory: 512Mi
+            memory: 1Gi
         startupProbe:
           failureThreshold: 1
           periodSeconds: 240

@@ -1,16 +1,20 @@
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { PerformanceMetrics } from '../types';
+import { formatPerformanceAsOfLabel } from '../utils/performanceAsOfDisplay';
 
 interface RollingReturnsChartProps {
     portfolio: PerformanceMetrics & { name: string };
     benchmark: PerformanceMetrics & { name: string };
     isPdfMode?: boolean;
     showTitle?: boolean; // Allow title to be hidden when used in contexts with existing titles
+    /** Chart graphic only. Used when the proposal page already prints the period counts. */
+    chartOnly?: boolean;
     secondaryPortfolio?: PerformanceMetrics & { name: string };
 }
 
-const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, benchmark, isPdfMode = false, showTitle = true, secondaryPortfolio }) => {
+const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, benchmark, isPdfMode = false, showTitle = true, chartOnly = false, secondaryPortfolio }) => {
+    const asOfLabel = formatPerformanceAsOfLabel(portfolio.performanceAsOf ?? benchmark.performanceAsOf);
 
     const mergedData = useMemo(() => {
         const allKeys = new Set([
@@ -42,14 +46,17 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
 
     return (
         <div className="bg-white px-0 py-0 rounded-lg">
-            {showTitle && (
+            {showTitle && !chartOnly && (
                 <div className="mb-1 pb-1 border-b border-gray-200 px-2 pt-1">
                     <h4 className="font-semibold text-base text-[#003365]" style={{ fontSize: '0.95rem' }}>Rolling 12-Month Returns Distribution</h4>
                     <p className="text-sm text-gray-500 mt-0.5" style={{ fontSize: '0.8rem' }}>Frequency analysis of monthly returns</p>
+                    {asOfLabel && (
+                        <p className="text-[#4b5563] mt-0.5 font-medium" style={{ fontSize: '0.7rem' }}>As of {asOfLabel}</p>
+                    )}
                 </div>
             )}
             {/* Lighter styling for stats section with adequate padding to prevent cutoff */}
-            <div className={`grid gap-x-6 text-sm mb-1 p-2.5 pb-3 bg-gray-50 rounded-lg border border-gray-200 mx-0 ${secondaryPortfolio ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
+            {!chartOnly && <div className={`grid gap-x-6 text-sm mb-1 p-2.5 pb-3 bg-gray-50 rounded-lg border border-gray-200 mx-0 ${secondaryPortfolio ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                 <div className="border-b md:border-b-0 md:border-r border-gray-200 pr-3 pb-2.5 md:pb-0 mb-2 md:mb-0">
                     <p className="font-medium text-gray-700 break-words" title={portfolio.name} style={{ fontSize: '0.85rem', marginBottom: '8px' }}>{portfolio.name}</p>
                     <div className="flex justify-between mt-1.5">
@@ -85,7 +92,7 @@ const RollingReturnsChart: React.FC<RollingReturnsChartProps> = ({ portfolio, be
                         <span className="text-red-600 font-semibold" style={{ fontSize: '0.8rem' }}>{benchmark.rollingReturnsAnalysis.percentNegative.toFixed(1)}%</span>
                     </div>
                 </div>
-            </div>
+            </div>}
             {/* Reduced margins and padding to maximize chart size, with adequate bottom margin for legend and angled labels */}
             <div style={{ width: '100%', height: isPdfMode ? 400 : 400 }} className="mt-0 px-0">
                 {isPdfMode ? (

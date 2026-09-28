@@ -1,9 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.min.mjs';
+import React, { useEffect, useState } from 'react';
 import { PlusCircleIcon, TrashIcon, EditIcon } from './icons/Icons';
 import { apiService } from '../services/apiService';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+import PdfThumbnail from './PdfThumbnail';
 
 interface PageLibraryItem {
     id: string;
@@ -15,7 +13,6 @@ interface PageLibraryItem {
 }
 
 interface PageLibraryManagerProps {
-    positionType: 'before' | 'after';
     onPageAdded?: () => void;
     onPageUpdated?: () => void;
     onPageDeleted?: () => void;
@@ -30,86 +27,7 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-/**
- * Safely extracts base64 data from page_data string.
- * Handles both data URL format (data:application/pdf;base64,<data>) and pure base64 format.
- */
-const extractBase64Data = (pageData: string): string => {
-    if (!pageData || typeof pageData !== 'string') {
-        throw new Error('pageData is empty, undefined, or not a string');
-    }
-    
-    // Trim whitespace
-    const trimmed = pageData.trim();
-    if (!trimmed) {
-        throw new Error('pageData is empty after trimming');
-    }
-    
-    // Check if it's a data URL (contains comma)
-    if (trimmed.includes(',')) {
-        const parts = trimmed.split(',');
-        if (parts.length >= 2 && parts[1] && parts[1].trim()) {
-            return parts[1].trim();
-        }
-        throw new Error('Invalid data URL format: missing base64 data after comma');
-    }
-    
-    // If no comma, assume it's already pure base64
-    return trimmed;
-};
-
-const PdfThumbnail: React.FC<{ pageData: string }> = ({ pageData }) => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        const renderPdf = async () => {
-            try {
-                const base64Data = extractBase64Data(pageData);
-                const pdfSrc = { data: atob(base64Data) };
-                const pdf = await pdfjsLib.getDocument(pdfSrc).promise;
-                const page = await pdf.getPage(1);
-                
-                const canvas = canvasRef.current;
-                if (!canvas) return;
-                
-                const context = canvas.getContext('2d');
-                if (!context) return;
-                
-                const container = canvas.parentElement;
-                if (!container) return;
-                
-                const viewport = page.getViewport({ scale: 1 });
-                const scale = container.clientWidth / viewport.width;
-                const scaledViewport = page.getViewport({ scale });
-
-                canvas.height = scaledViewport.height;
-                canvas.width = scaledViewport.width;
-
-                await page.render({ canvasContext: context, viewport: scaledViewport }).promise;
-            } catch (e: any) {
-                console.error("Error rendering PDF thumbnail:", e);
-                setError('Could not render PDF preview.');
-            }
-        };
-
-        if (pageData) {
-            renderPdf();
-        }
-    }, [pageData]);
-
-    return (
-        <div className="aspect-[210/297] w-full h-full object-contain bg-gray-100 flex items-center justify-center">
-            {error ? (
-                <span className="text-red-500 text-xs p-2">{error}</span>
-            ) : (
-                <canvas ref={canvasRef} />
-            )}
-        </div>
-    );
-};
-
-const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, onPageAdded, onPageUpdated, onPageDeleted }) => {
+const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ onPageAdded, onPageUpdated, onPageDeleted }) => {
     const [pages, setPages] = useState<PageLibraryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -156,7 +74,7 @@ const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, o
             await apiService.createPageInLibrary({
                 name: newPageName.trim(),
                 page_data: base64,
-                position_type: 'before'
+                position_type: 'before' // Default; placement is chosen when assigning to front/back
             });
             
             setNewPageName('');
@@ -213,18 +131,15 @@ const PageLibraryManager: React.FC<PageLibraryManagerProps> = ({ positionType, o
         }
     };
 
-    const title = 'Page Library';
-
     return (
-        <div className="bg-white p-6 rounded-lg shadow-lg">
+        <div>
             <div className="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
                 <button
                     onClick={() => setShowAddModal(true)}
                     className="flex items-center space-x-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700"
                 >
                     <PlusCircleIcon />
-                    <span>Add Page to Library</span>
+                    <span>Add Page</span>
                 </button>
             </div>
 

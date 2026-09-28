@@ -1,5 +1,21 @@
 import { MonthlyReturn } from '../types';
 
+/** Adds months from `additions` only when that YYYY-MM is not already in `existing`. */
+export const appendMonthlyReturns = (existing: MonthlyReturn[], additions: MonthlyReturn[]): MonthlyReturn[] => {
+    const merged = new Map<string, number>();
+    for (const r of existing) {
+        merged.set(r.date, r.value);
+    }
+    for (const r of additions) {
+        if (!merged.has(r.date)) {
+            merged.set(r.date, r.value);
+        }
+    }
+    return Array.from(merged.entries())
+        .map(([date, value]) => ({ date, value }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+};
+
 export const parseReturnsCSV = (file: File, itemName: string): Promise<MonthlyReturn[]> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
